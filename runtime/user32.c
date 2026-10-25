@@ -10,9 +10,30 @@
 static uint32_t g_wndproc;
 static int g_screen_w = 1280, g_screen_h = 720;
 static int g_quit;
+static int g_activated;
+static void post_msg(uint32_t msg, uint32_t wp, uint32_t lp);
 
 uint32_t user32_wndproc(void) { return g_wndproc; }
 void user32_set_screen(int w, int h) { g_screen_w = w; g_screen_h = h; }
+
+/* Windows activates a shown top-level window: WM_ACTIVATEAPP(TRUE) is what
+ * tells the guest it may start rendering (USM idles in PeekMessageA until
+ * its wndproc sees it). Posted, not sent, so it arrives on the game's pump. */
+static void post_activate(void) {
+    if (g_activated) return;
+    g_activated = 1;
+    LOG("posting WM_ACTIVATEAPP(1)");
+    post_msg(0x1C, 1, 0);  /* WM_ACTIVATEAPP, wParam = TRUE */
+    post_msg(0x07, 0, 0);  /* WM_SETFOCUS */
+    post_msg(0x06, 1, 0);  /* WM_ACTIVATE, WA_ACTIVE */
+}
+
+/* App switched away / came back (Android pause, desktop focus change). */
+void user32_focus(int active) {
+    LOG("window %s", active ? "activated" : "deactivated");
+    if (active) { g_activated = 0; post_activate(); }
+    else { g_activated = 1; post_msg(0x1C, 0, 0); post_msg(0x08, 0, 0); /* WM_ACTIVATEAPP(0), WM_KILLFOCUS */ }
+}
 
 SHIM(RegisterClassExA) {
     g_wndproc = M32(ARG(0) + 8);
@@ -21,10 +42,11 @@ SHIM(RegisterClassExA) {
 }
 SHIM(CreateWindowExA) {
     LOG("CreateWindowExA '%s' %dx%d", GSTR(ARG(2)) ? GSTR(ARG(2)) : "", (int)ARG(6), (int)ARG(7));
+    post_activate();
     RET(FAKE_HWND, 12);
 }
 SHIM(DestroyWindow) { RET(1, 1); }
-SHIM(ShowWindow) { RET(1, 2); }
+SHIM(ShowWindow) { post_activate(); RET(1, 2); }
 SHIM(UpdateWindow) { RET(1, 1); }
 SHIM(MoveWindow) { RET(1, 6); }
 SHIM(SetForegroundWindow) { RET(1, 1); }

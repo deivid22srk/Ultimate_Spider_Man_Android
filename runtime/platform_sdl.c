@@ -174,6 +174,11 @@ void platform_present_hook(void) {
         }
         if (e.type == SDL_KEYDOWN || e.type == SDL_KEYUP)
             key_event(e.key.keysym.scancode, e.type == SDL_KEYDOWN);
+        if (e.type == SDL_WINDOWEVENT) {
+            extern void user32_focus(int);
+            if (e.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) user32_focus(1);
+            else if (e.window.event == SDL_WINDOWEVENT_FOCUS_LOST) user32_focus(0);
+        }
         extern void input_handle_event(const SDL_Event *e);
         input_handle_event(&e);
         extern void touch_handle_event(const SDL_Event *e);
