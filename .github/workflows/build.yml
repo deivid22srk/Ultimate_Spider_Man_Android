@@ -2,22 +2,23 @@ name: build
 
 # The APK is only ever built here, never on a developer machine.
 #
-# Two modes:
-#   app-only (default): builds the launcher + runtime against ci/gen_stub.
-#       The APK installs and the launcher validates the game folder, but it
-#       contains no recompiled game code, so Play stops with a clear message.
-#       This mode needs nothing from the game and is safe for a public repo.
-#   full: downloads gen.tar.zst (the recompiled C, derived from the user's own
-#       game files) from a *private* release of this repository and builds the
-#       real APK. gen/ is never committed and never published.
+# Strategy B: this repository is public and contains no game code and no code
+# generated from the game. The workflow therefore builds the launcher and the
+# runtime against ci/gen_stub (empty recompiled tables):
+#
+#   * the APK installs, the launcher validates your game folder and the exe
+#     build, and "Play" stops with a clear message;
+#   * it proves the whole Android/runtime build works, on every push.
+#
+# The full APK (with the game's recompiled code) is built from gen/, which is
+# derived from your own copy of the game and must never be published. Do that
+# in a private fork of this repository (drop gen/ in, the same workflow then
+# compiles it), or build locally with Android Studio / gradlew. See README,
+# "Building the full APK".
 
 on:
   workflow_dispatch:
     inputs:
-      gen_release:
-        description: "Private release tag that holds gen.tar.zst (empty = app-only build)"
-        required: false
-        default: ""
       lb_gen_jobs:
         description: "Parallel compiles of recompiled files (RAM: ~1.5 GB each)"
         required: false
@@ -29,7 +30,7 @@ on:
 jobs:
   apk:
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 180
     permissions:
       contents: read
     steps:
@@ -53,34 +54,20 @@ jobs:
       - name: Toolchain versions
         run: |
           java -version
-          echo "ANDROID_HOME=$ANDROID_HOME"
           ls "$ANDROID_HOME/ndk"
           cmake --version | head -1
 
-      # ---- recompiled code -------------------------------------------------
-      # full mode: private release asset. app-only: stub tables (no game code).
-      - name: Fetch recompiled code (private release)
-        if: ${{ inputs.gen_release != '' }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ inputs.gen_release }}
+      # No game code in this repository: gen/ is either the stub (public CI) or
+      # the real, git-ignored gen/ when this workflow runs in a private fork.
+      - name: Use stub tables when gen/ is absent
         run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/gen"
-          gh release download "$TAG" --pattern 'gen.tar.zst*' --dir "$RUNNER_TEMP/gen" \
-            --repo "$GITHUB_REPOSITORY"
-          cd "$RUNNER_TEMP/gen"
-          if ls gen.tar.zst.part* >/dev/null 2>&1; then cat gen.tar.zst.part* > gen.tar.zst; fi
-          mkdir -p "$GITHUB_WORKSPACE/gen"
-          zstd -d --stdout gen.tar.zst | tar -xf - -C "$GITHUB_WORKSPACE/gen"
-          echo "gen/: $(ls "$GITHUB_WORKSPACE/gen"/*.c | wc -l) C files, $(du -sh "$GITHUB_WORKSPACE/gen" | cut -f1)"
-
-      - name: Use stub tables (app-only build)
-        if: ${{ inputs.gen_release == '' }}
-        run: |
-          mkdir -p gen
-          cp ci/gen_stub/* gen/
-          echo "app-only build: gen/ has only the stub tables"
+          if [ -z "$(ls -A gen 2>/dev/null)" ]; then
+            mkdir -p gen
+            cp ci/gen_stub/* gen/
+            echo "gen/ absent: building the app-only APK"
+          else
+            echo "gen/ present: building the full APK ($(ls gen/*.c | wc -l) C files)"
+          fi
 
       - name: Build APK
         working-directory: android
@@ -92,15 +79,14 @@ jobs:
             -PndkVersion=27.2.12479018 \
             -PlbGenJobs="${LB_GEN_JOBS:-2}"
 
-      - name: Rename artifact
+      - name: Collect artifact
         run: |
           mkdir -p out
-          if [ -n "${{ inputs.gen_release }}" ]; then NAME=UltimateSpiderMan-full; else NAME=UltimateSpiderMan-apponly; fi
-          cp android/app/build/outputs/apk/debug/app-debug.apk "out/$NAME.apk"
+          cp android/app/build/outputs/apk/debug/app-debug.apk out/UltimateSpiderMan.apk
           ls -l out
 
       - uses: actions/upload-artifact@v4
         with:
           name: UltimateSpiderMan-apk
-          path: out/*.apk
+          path: out/UltimateSpiderMan.apk
           if-no-files-found: error

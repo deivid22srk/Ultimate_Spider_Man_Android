@@ -95,30 +95,36 @@ and `analysis/` (discovery output). Measured on a Snapdragon 888 phone:
 ## 2. Build the APK
 
 **The APK is built by GitHub Actions only** (`.github/workflows/build.yml`).
-The workflow has two modes:
 
-- **app-only** (default, no inputs): builds the launcher + runtime against
-  `ci/gen_stub` (empty tables). The APK installs and the launcher validates
-  your game folder, but Play stops with a clear message. No game code involved.
-- **full** (`gen_release=<tag>`): downloads `gen.tar.zst` from a **private**
-  release of this repository and builds the real APK.
+This repository is **public** and contains no game code and no code generated
+from the game, so the public workflow builds the **app-only** APK: launcher +
+runtime against `ci/gen_stub` (empty recompiled tables). It installs, the
+launcher validates your folder and the exe build, and **Play** stops with a
+clear message. It exists to prove that the Android/runtime build works on every
+push.
 
-To use full mode, upload your own `gen/` to a private release:
+### Building the full APK
+
+`gen/` is derived from your own copy of the game and must never be published
+(it is git-ignored). Build the full APK in a **private fork** of this
+repository, or locally:
 
 ```sh
-tar -I zstd -cf gen.tar.zst -C . gen
-gh release create gen-$(date +%Y%m%d) gen.tar.zst --repo <you>/Ultimate_Spider_Man_Android
-gh workflow run build.yml -f gen_release=gen-$(date +%Y%m%d) -f lb_gen_jobs=2
-gh run watch
-gh run download
+# private fork of this repo, with your own gen/ produced by tools/regen_gen.sh
+git add -f gen            # only in your private fork, never here
+git commit -m "local gen"
+gh workflow run build.yml -f lb_gen_jobs=2 --repo <you>/<your-private-fork>
+gh run watch --repo <you>/<your-private-fork>
+gh run download --repo <you>/<your-private-fork>
 ```
 
-`gen/` is derived from the game and is not redistributable, so it must never be
-committed, attached to a public release, or put in a public artifact.
+The workflow compiles whatever is in `gen/`: with `ci/gen_stub` it makes the
+app-only APK, with a real `gen/` it makes the full one. Locally, the same build
+is `cd android && ./gradlew assembleDebug -PndkVersion=27.2.12479018 -PlbGenJobs=2`.
 
-The APK is written to `android/app/build/outputs/apk/debug/app-debug.apk` by
-the workflow. It is signed with the debug key (fine for personal use, not for
-distribution).
+`LB_GEN_JOBS` caps how many recompiled files are compiled at once (each needs
+~1.5 GB of RAM). The APK is signed with the debug key (fine for personal use,
+not for distribution).
 
 ## 3. Install
 
