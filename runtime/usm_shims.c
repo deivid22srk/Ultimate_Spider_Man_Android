@@ -723,6 +723,139 @@ SHIM(gethostbyname) {
 }
 
 /* ====================================================================== */
+/* ole32: DxDiag COM objects (the DirectX 9.0c check)                     */
+/* ====================================================================== */
+/* Before it starts, the game asks Windows which DirectX it has, through the
+ * DxDiag COM provider (this is the "DirectX 9.0c not found." message box):
+ *
+ *   CoCreateInstance(CLSID_DxDiagProvider, NULL, CLSCTX_INPROC_SERVER,
+ *                    IID_IDxDiagProvider, &p);
+ *   p->Initialize(&params);  p->GetRootObject(&root);
+ *   root->GetChildContainer(L"DxDiag_SystemInfo", &sys);
+ *   sys->GetProp(L"dwDirectXVersionMajor",  &v);   // VT_UI4 9
+ *   sys->GetProp(L"dwDirectXVersionMinor",  &v);   // VT_UI4 0
+ *   sys->GetProp(L"szDirectXVersionLetter", &v);   // VT_BSTR "c"
+ *
+ * The provider is not part of dxvk, so we hand out small COM objects with
+ * guest vtables that answer exactly those three properties. Everything is
+ * leaked on purpose: the game only queries once and exits.
+ * The CLSID is {a65b8071-3bfe-4213-9a5b-491da4461ca7}. */
+static const uint8_t k_clsid_dxdiag[16] = {0x71, 0x80, 0x5b, 0xa6, 0xfe, 0x3b, 0x13, 0x42,
+                                           0x9a, 0x5b, 0x49, 0x1d, 0xa4, 0x46, 0x1c, 0xa7};
+static uint32_t g_diag_provider, g_diag_root, g_diag_sysinfo;
+
+static void wide_to_ascii(uint32_t w, char *out, size_t n) {
+    size_t i = 0;
+    if (w)
+        for (; i + 1 < n && M16(w + 2 * i); i++) out[i] = (char)M16(w + 2 * i);
+    out[i] = 0;
+}
+
+static uint32_t bstr_alloc(const char *s) {
+    uint32_t n = (uint32_t)strlen(s);
+    uint32_t p = gmalloc(4 + 2 * n + 2);
+    if (!p) return 0;
+    M32(p) = 2 * n;
+    for (uint32_t i = 0; i < n; i++) M16(p + 4 + 2 * i) = (uint8_t)s[i];
+    M16(p + 4 + 2 * n) = 0;
+    return p + 4;
+}
+
+/* IUnknown, shared by both objects. The game only ever asks for the interface
+ * it created, so any IID resolves to the same object. */
+SHIM(diag_qi) {
+    if (ARG(2)) M32(ARG(2)) = ARG(0);
+    RET(0, 3);
+}
+SHIM(diag_addref) { RET(2, 1); }
+SHIM(diag_release) { RET(1, 1); }
+
+/* IDxDiagProvider */
+SHIM(diag_init) { RET(0, 2); }
+SHIM(diag_getroot) {
+    if (ARG(1)) M32(ARG(1)) = g_diag_root;
+    RET(0, 2);
+}
+
+/* IDxDiagContainer */
+SHIM(diag_numchild) {
+    if (ARG(1)) M32(ARG(1)) = 1;
+    RET(0, 2);
+}
+SHIM(diag_enumchild) { RET(0x80004005u, 5); }
+SHIM(diag_getchild) {
+    char name[128];
+    wide_to_ascii(ARG(1), name, sizeof name);
+    if (!strcmp(name, "DxDiag_SystemInfo")) {
+        if (ARG(2)) M32(ARG(2)) = g_diag_sysinfo;
+        RET(0, 3);
+    }
+    LOG("DxDiag: GetChildContainer(\"%s\") -> E_FAIL", name);
+    RET(0x80004005u, 3);
+}
+SHIM(diag_numprops) {
+    if (ARG(1)) M32(ARG(1)) = 3;
+    RET(0, 2);
+}
+SHIM(diag_enumprops) { RET(0x80004005u, 5); }
+SHIM(diag_getprop) {
+    char name[128];
+    uint32_t var = ARG(2);
+    wide_to_ascii(ARG(1), name, sizeof name);
+    if (!var) RET(0x80070057u, 3);
+    memset(MEM + var, 0, 16); /* VARIANT: vt at +0, value at +8 */
+    if (!strcmp(name, "dwDirectXVersionMajor")) { M16(var) = 19; M32(var + 8) = 9; RET(0, 3); }
+    if (!strcmp(name, "dwDirectXVersionMinor")) { M16(var) = 19; M32(var + 8) = 0; RET(0, 3); }
+    if (!strcmp(name, "szDirectXVersionLetter")) { M16(var) = 8; M32(var + 8) = bstr_alloc("c"); RET(0, 3); }
+    LOG("DxDiag: GetProp(\"%s\") -> E_FAIL", name);
+    RET(0x80004005u, 3);
+}
+
+static uint32_t mk_com_object(uint32_t vtbl) {
+    uint32_t o = gmalloc(8);
+    M32(o) = vtbl;
+    M32(o + 4) = 1;
+    return o;
+}
+
+/* Called from ole32!CoCreateInstance (runtime/misc.c). 1 = handled. */
+int usm_cocreate(uint32_t clsid, uint32_t iid, uint32_t out) {
+    (void)iid;
+    if (!clsid || !out || memcmp(MEM + clsid, k_clsid_dxdiag, 16)) return 0;
+    M32(out) = g_diag_provider;
+    LOG("CoCreateInstance(DxDiagProvider) -> IDxDiagProvider (reporting DirectX 9.0c)");
+    return 1;
+}
+
+static void dxdiag_init(void) {
+    uint32_t pv = gmalloc(5 * 4), cv = gmalloc(9 * 4);
+    M32(pv + 0) = rt_thunk(shim_diag_qi, "IDxDiagProvider::QueryInterface");
+    M32(pv + 4) = rt_thunk(shim_diag_addref, "IDxDiagProvider::AddRef");
+    M32(pv + 8) = rt_thunk(shim_diag_release, "IDxDiagProvider::Release");
+    M32(pv + 12) = rt_thunk(shim_diag_init, "IDxDiagProvider::Initialize");
+    M32(pv + 16) = rt_thunk(shim_diag_getroot, "IDxDiagProvider::GetRootObject");
+    M32(cv + 0) = rt_thunk(shim_diag_qi, "IDxDiagContainer::QueryInterface");
+    M32(cv + 4) = rt_thunk(shim_diag_addref, "IDxDiagContainer::AddRef");
+    M32(cv + 8) = rt_thunk(shim_diag_release, "IDxDiagContainer::Release");
+    M32(cv + 12) = rt_thunk(shim_diag_numchild, "IDxDiagContainer::GetNumberOfChildContainers");
+    M32(cv + 16) = rt_thunk(shim_diag_enumchild, "IDxDiagContainer::EnumChildContainerNames");
+    M32(cv + 20) = rt_thunk(shim_diag_getchild, "IDxDiagContainer::GetChildContainer");
+    M32(cv + 24) = rt_thunk(shim_diag_numprops, "IDxDiagContainer::GetNumberOfProps");
+    M32(cv + 28) = rt_thunk(shim_diag_enumprops, "IDxDiagContainer::EnumPropNames");
+    M32(cv + 32) = rt_thunk(shim_diag_getprop, "IDxDiagContainer::GetProp");
+    g_diag_provider = mk_com_object(pv);
+    g_diag_root = mk_com_object(cv);
+    g_diag_sysinfo = mk_com_object(cv);
+}
+
+/* binkw32 makes its decoder pages writable at start-up; guest memory is always
+ * readable and writable here, so this only has to report success. */
+SHIM(VirtualProtect) {
+    if (ARG(3)) M32(ARG(3)) = 0x04; /* PAGE_READWRITE */
+    RET(1, 4);
+}
+
+/* ====================================================================== */
 /* registration                                                           */
 /* ====================================================================== */
 
@@ -766,7 +899,7 @@ static const ShimDef defs[] = {
     K(GetProfileStringA) K(GetProfileIntA) K(WriteProfileStringA)
     K(GlobalAlloc) K(GlobalLock) K(GlobalUnlock) K(GlobalFree)
     K(OpenProcess) K(SwitchToThread) K(FindFirstFileExA)
-    K(GetOverlappedResult) K(CancelIo) K(lstrcmpi)
+    K(GetOverlappedResult) K(CancelIo) K(lstrcmpi) K(VirtualProtect)
 #undef K
 
 #define U(n) {"user32.dll", #n, shim_##n},
@@ -833,6 +966,8 @@ void usm_shims_init(void) {
     M32(g_exc_vtbl) = rt_thunk(shim_exc_dtor, "exception::~exception");
     M32(g_exc_vtbl + 4) = rt_thunk(shim_exc_what, "exception::what");
     g_exc_msg = gstrdup("Unknown exception");
+
+    dxdiag_init();
 
     LOG("usm_shims: %d USM-specific imports registered (msvcr71/msvcp71, win32 gaps)",
         (int)(sizeof defs / sizeof defs[0] - 1));

@@ -41,6 +41,10 @@ SHIM(CoCreateInstance) {
     extern int xaudio2_create(uint32_t clsid, uint32_t *out);
     uint32_t obj;
     if (ARG(4) && xaudio2_create(ARG(0), &obj)) { M32(ARG(4)) = obj; RET(0, 5); }
+#ifdef GAME_USM
+    { extern int usm_cocreate(uint32_t clsid, uint32_t iid, uint32_t out);
+      if (usm_cocreate(ARG(0), ARG(3), ARG(4))) RET(0, 5); }
+#endif
     LOG("CoCreateInstance -> E_NOINTERFACE");
     if (ARG(4)) M32(ARG(4)) = 0;
     RET(0x80004002u, 5);
