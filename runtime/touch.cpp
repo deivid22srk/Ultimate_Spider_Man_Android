@@ -205,6 +205,21 @@ extern "C" void touch_handle_event(const SDL_Event *e) {
         g_ptr_y = y;
         g_ptr_ms = SDL_GetTicks();
         user32_mouse_button(0, 1);
+        /* one line per tap: the only way to see, from port/log.txt, where a
+         * touch landed in the game's own cursor space */
+        LOG("touch: tap %d,%d -> cursor %d,%d (screen %dx%d)", (int)(x * 1000), (int)(y * 1000),
+            (int)(x * w), (int)(y * h), w, h);
+    }
+    /* Dragging in the left half (the stick side) walks the cursor with the
+     * finger; in the right half the mouse deltas already do it (at the game's
+     * mouse sensitivity), so feeding both would double the movement. */
+    if (!down && !up && f->ptr && f->stick) {
+        int w = 1280, h = 720;
+        user32_screen(&w, &h);
+        user32_cursor_set((int)(x * w), (int)(y * h));
+        g_ptr_x = x;
+        g_ptr_y = y;
+        g_ptr_ms = SDL_GetTicks();
     }
     if (!down && !up && f->look) {
         int w = 0, h = 0;
