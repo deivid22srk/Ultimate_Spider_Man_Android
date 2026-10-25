@@ -328,6 +328,41 @@ Y = Kick — exactly the order `runtime/input.c` presses them in.
    axes; the same deltas keep the virtual cursor in step, so the same gesture
    moves the pointer in menus.
 
+## 11c. Touch overlay and the icon pack
+
+The overlay presses **keys of the game's own bindings**, not pad buttons the
+game does not read (there is no XInput in `USM.exe`, §11b). `runtime/input.c`
+translates the virtual pad to those keys, and `runtime/touch.cpp` draws the
+buttons. Which icon each button wears follows from that table:
+
+| Overlay button | Key it sends | Action in `USM.exe` | Icon (`port/icons/`) |
+|---|---|---|---|
+| A | Space | `Jump` (id 09) | `hud_jump.png` |
+| B | C | `ThrowWeb` (id 0D) | `hud_web.png` |
+| X | Q | `Punch` (id 0B) | `hud_punch.png` |
+| Y | E | `Kick` (id 0C) | `hud_kick.png` |
+| LB | F | `StickToWalls` (id 0A) | `hud_wallcrawl.png` |
+| RB | V | `BlackButton` (id 0E) | `hud_black.png` |
+| Start | Esc | `Pause` (id 0F) | `hud_pause.png` |
+| Back | M | `BackButton` (id 10) | `hud_back.png` |
+
+The art is the port's own (generated for this port, never extracted from the
+game); it is unzipped next to the port's folder as `<game>/port/icons/`, with
+the pressed variants in `icons/on/`. `runtime/art.c` packs whatever it finds
+into one 1024×1536 atlas uploaded as a `D3DFMT_A8R8G8B8` texture, so the whole
+overlay is two `DrawPrimitiveUP` calls (plain discs + icons); **every icon is
+optional** and a missing file falls back to the disc. `runtime/touch.cpp` logs
+`touch: N HUD icons loaded from <dir>` on the first frame, which is how a run
+is confirmed from `port/log.txt`.
+
+Context-dependent behaviour implemented so far, and no more: the camera-zone
+hint (`hud_campad`) is drawn only while a finger is dragging in the camera
+zone, and the pointer art (`hud_cursor`) only for 1.5 s after a pointer
+gesture. Swapping the whole HUD by game state (menus vs gameplay vs cutscene)
+is **not** implemented — none of the signals it needs (the front-end level
+pointer, Bink playback, a meaningful `ClipCursor`/`ShowCursor` change) is
+wired up yet.
+
 ## 12. Risk plan
 
 | Risk | Likelihood | Mitigation |

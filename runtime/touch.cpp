@@ -293,8 +293,7 @@ const ArtEntry *art(const char *key) {
 
 // <game>/port/icons, and (in case the ZIP was unpacked flat) <game>/port itself
 void icons_dirs(std::string *out, int *n) {
-    extern char g_save_dir[1024];
-    std::string port(g_save_dir);
+    std::string port(g_save_dir);   /* declared in rt.h */
     size_t l = port.size();
     if (l > 5 && port.compare(l - 5, 5, "/save") == 0) port.resize(l - 5);
     out[(*n)++] = port + "/icons";

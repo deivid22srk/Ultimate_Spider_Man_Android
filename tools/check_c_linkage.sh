@@ -29,8 +29,12 @@ for f in runtime/*.cpp; do
         -Iandroid/app/jni/dxvk/include/native/directx \
         -Iandroid/app/jni/dxvk/include/native/windows -DDXVK_NATIVE \
         -I/tmp/opencode/sdlink_inc -Wno-everything -c "$f" -o "$o"
-    # undefined symbols that look like a runtime C symbol but are mangled
-    hits=$(llvm-nm -u "$o" | grep -E '_Z.*(user32_|platform_|input_|usm_|art_|png_)' || true)
+    # 1. any *undefined* symbol in the anonymous namespace is this bug: an
+    #    anonymous namespace has internal linkage, so such a symbol can only
+    #    come from a block-scope `extern` declaration that clang turned local
+    #    (`extern char g_save_dir[1024];` inside a function did exactly that).
+    # 2. else, a runtime C symbol referenced through a C++ mangled name.
+    hits=$(llvm-nm -u "$o" | grep -E '_ZN12_GLOBAL__N_1|_Z.*(user32_|platform_|input_|usm_|art_|png_)' || true)
     if [ -n "$hits" ]; then
         echo "!! $f calls the C runtime through a mangled name:"
         echo "$hits"
