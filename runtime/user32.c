@@ -125,6 +125,7 @@ const uint8_t *user32_vk_states(void) { return g_vk_state; }
 void user32_key_event(uint32_t vk, uint32_t sc, int down) {
     if (!vk) return;
     if (vk < 256) g_vk_state[vk] = down ? 0x80 : 0;
+    LOG("key %s vk=%02x sc=%02x", down ? "down" : "up", vk, sc & 0xFF);
     uint32_t lp = 1 | (sc & 0xFF) << 16 | (down ? 0 : 0xC0000000u);
     post_msg(down ? 0x100 : 0x101, vk, lp); /* WM_KEYDOWN / WM_KEYUP */
 }

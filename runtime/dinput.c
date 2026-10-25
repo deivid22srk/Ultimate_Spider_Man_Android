@@ -99,6 +99,16 @@ SHIM(dev_GetDeviceState) {
             }
         for (uint32_t k = 0; k < 256 && k < n; k++)
             if (vd[k]) M8(p + k) = 0x80;
+        {   /* diagnostic: is the game polling the keyboard, and do our
+             * injected keys show up in the state it reads? */
+            static unsigned calls, last_n;
+            unsigned down = 0;
+            for (uint32_t k = 0; k < 256 && k < n; k++)
+                if (M8(p + k)) down++;
+            if (++calls % 600 == 0 || (down && down != last_n))
+                LOG("dinput: keyboard poll #%u, %u key(s) down", calls, down);
+            last_n = down;
+        }
     } else {
         int x, y;
         Uint32 b = SDL_GetRelativeMouseState(&x, &y);
@@ -192,7 +202,12 @@ SHIM(di_CreateDevice) {
     int kind;
     if (guid_eq(guid, GUID_SysKeyboard)) kind = DEV_KEYBOARD;
     else if (guid_eq(guid, GUID_SysMouse)) kind = DEV_MOUSE;
-    else { M32(ARG(2)) = 0; RET(0x80040154u, 4); } /* DIERR_DEVICENOTREG */
+    else {
+        static int logged;
+        if (!logged++) LOG("DirectInput: CreateDevice for a gamepad (no pad device: DIERR_DEVICENOTREG)");
+        M32(ARG(2)) = 0;
+        RET(0x80040154u, 4); /* DIERR_DEVICENOTREG */
+    }
     DIDev *d = calloc(1, sizeof *d);
     d->kind = kind;
     M32(ARG(2)) = hcom_new(&k_didev, d);
