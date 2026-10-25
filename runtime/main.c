@@ -263,6 +263,7 @@ static void on_crash(int sig, siginfo_t *si, void *ucv) {
     fprintf(stderr, "  guest mem base %p\n", (void *)MEM);
     extern void rt_dump_guest(void);
     rt_dump_guest();
+    { extern void rt_wd_dump(void); rt_wd_dump(); }
     fprintf(stderr, "backtrace:\n");
     print_pc(-1, pc);
     print_pc(-2, lr);

@@ -108,6 +108,16 @@ static void wd_bt(int sig) {
 }
 #endif
 
+/* Called from the crash handler: what each guest thread was doing when the
+ * process died (last Win32 import, its caller, and the arguments' stack). */
+void rt_wd_dump(void) {
+    int n = g_wd_n < WD_MAX ? g_wd_n : WD_MAX;
+    for (int i = 0; i < n; i++)
+        fprintf(stderr, "  thread %d (tid %u, guest %u): last %s from %08x, %u calls; esi %08x ebx %08x esp %08x\n",
+                i, g_wd[i].tid, g_wd[i].gtid, g_wd[i].name ? g_wd[i].name : "-", g_wd[i].ret, g_wd[i].calls,
+                g_wd[i].esi, g_wd[i].ebx, g_wd[i].esp);
+}
+
 static void *wd_thread(void *arg) {
     (void)arg;
     uint32_t last[WD_MAX] = {0}, still[WD_MAX] = {0};
