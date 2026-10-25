@@ -67,6 +67,45 @@ static int g_map_soft;              /* walk length != map size */
 static uint32_t g_map_op_ret, g_map_op_ptr, g_map_op_node, g_map_op_i;
 static char g_map_op_name[8], g_map_why[96];
 
+#define HOP 12
+static struct { const char *op; uint32_t size, ret; } g_hop[HOP];
+static int g_hop_n;
+
+static void hop_note(const char *op, uint32_t size, uint32_t ret) {
+    int i = g_hop_n++ % HOP;
+    g_hop[i].op = op; g_hop[i].size = size; g_hop[i].ret = ret;
+}
+
+static void hop_dump(const char *why) {
+    fprintf(stderr, "usm: last heap ops before %s:\n", why);
+    for (int k = 0; k < HOP; k++) {
+        int i = (g_hop_n - HOP + k + 2 * HOP) % HOP;
+        if (!g_hop[i].op) continue;
+        fprintf(stderr, "usm:   #%d %s(%x) ret=%08x\n", g_hop_n - HOP + k + 1, g_hop[i].op,
+                g_hop[i].size, g_hop[i].ret);
+    }
+}
+
+static void heap_walk_check(void) {
+    uint32_t b = GUEST_HEAP_BASE + 8;
+    int n = 0, bad = 0;
+    while (b < g_top) {
+        uint32_t raw = M32(b + 4), sz = raw & ~15u;
+        if (sz < MINBLK || sz > 0x10000000u || b + sz > g_top) {
+            if (bad++ < 8)
+                fprintf(stderr, "usm: heap block %08x: bad header %08x (prev %08x)\n",
+                        b, raw, M32(b));
+            break;
+        }
+        if (b + sz < g_top && M32(b + sz) != sz && bad++ < 8)
+            fprintf(stderr, "usm: heap block %08x size %x: next prev-size %08x\n",
+                    b, sz, M32(b + sz));
+        b += sz; n++;
+    }
+    fprintf(stderr, "usm: heap walk: %d blocks, reached %08x (top %08x)%s\n",
+            n, b, g_top, bad ? " -- BROKEN" : "");
+}
+
 static int on_guest_stack(CPU *c, uint32_t want) {
     if (!c) return 0;
     uint32_t sp = c->r[4];
@@ -75,12 +114,14 @@ static int on_guest_stack(CPU *c, uint32_t want) {
     return 0;
 }
 
-void usm_map_watch_note(const char *op, uint32_t ptr) {
+void usm_map_watch_note(const char *op, uint32_t req, uint32_t ptr) {
     if (!g_map_watch) return;
     uint32_t map = 0x95B79Cu;
     uint32_t sent = M32(map + 0x08), size = M32(map + 0x24), mask = M32(map + 0x20);
     if (sent < GUEST_HEAP_BASE || sent >= GUEST_HEAP_END) return;
     if (size > 4096 || mask > 4096) return;
+    CPU *cc = rt_current_cpu();
+    hop_note(op, req, cc ? M32(cc->r[4]) : 0);
     uint32_t n = M32(sent);
     int i = 0;
     while (n != sent) {
@@ -96,6 +137,8 @@ void usm_map_watch_note(const char *op, uint32_t ptr) {
                 snprintf(g_map_why, sizeof g_map_why, "node[%d]=%08x", i, n);
                 fprintf(stderr, "usm: MAP BROKEN after %s(%08x) ret=%08x: %s (size %u mask %x)\n",
                         op, ptr, g_map_op_ret, g_map_why, size, mask);
+                hop_dump("the break");
+                heap_walk_check();
             }
             g_map_watch = 0;
             return;
@@ -103,7 +146,7 @@ void usm_map_watch_note(const char *op, uint32_t ptr) {
         n = M32(n);
         i++;
     }
-    if (ptr && op[0] == 'm' && on_guest_stack(rt_current_cpu(), 0x5095F6u)) {
+    if (req == 16 && op[0] == 'm' && on_guest_stack(rt_current_cpu(), 0x5095F6u)) {
         static int nins;
         fprintf(stderr, "usm: map insert #%d node=%08x size=%u mask=%x walk=%d\n",
                 ++nins, ptr, size, mask, i);
@@ -145,7 +188,7 @@ uint32_t gmalloc(uint32_t n) {
                 set_block(b, sz, 1);
             }
             pthread_mutex_unlock(&g_heap_lock);
-            usm_map_watch_note("malloc", n);
+            usm_map_watch_note("malloc", n, b + HDR);
             return b + HDR;
         }
     }
@@ -160,7 +203,7 @@ uint32_t gmalloc(uint32_t n) {
     set_block(b, need, 1);
     g_last_block = b;
     pthread_mutex_unlock(&g_heap_lock);
-    usm_map_watch_note("malloc", n);
+    usm_map_watch_note("malloc", n, b + HDR);
     return b + HDR;
 }
 
@@ -202,13 +245,13 @@ void gfree(uint32_t p) {
         g_last_block = 0;
         if (b > GUEST_HEAP_BASE + 8 && BPREV(b)) g_last_block = b - BPREV(b);
         pthread_mutex_unlock(&g_heap_lock);
-        usm_map_watch_note("free", p);
+        usm_map_watch_note("free", 0, p);
         return;
     }
     set_block(b, sz, 0);
     link_free(b);
     pthread_mutex_unlock(&g_heap_lock);
-    usm_map_watch_note("free", p);
+    usm_map_watch_note("free", 0, p);
 }
 
 uint32_t gsize(uint32_t p) {
