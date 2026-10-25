@@ -23,9 +23,17 @@ typedef struct {
     double pos;         /* in frames */
     int playing, looping;
     uint32_t guest;     /* guest object */
+    /* IDirectSound3DListener / IDirectSound3DBuffer, handed out lazily when the
+     * game queries them on a buffer. The parameters are stored faithfully but
+     * not applied to the mix (all sources stay centred) -- the game needs the
+     * calls to succeed, it never reads the result back. */
+    uint32_t listener, buf3d;
+    struct { uint32_t dwSize; float pos[3], vel[3], front[3], top[3], dist, dopp, rolloff; } lp;
+    struct { uint32_t dwSize; float pos[3], vel[3]; uint32_t inside, outside; float cone[3];
+             int32_t cone_vol; float min_dist, max_dist; uint32_t mode; } bp;
 } DSBuf;
 
-static HComClass k_ds8, k_dsb;
+static HComClass k_ds8, k_dsb, k_ds3dl, k_ds3db;
 static SDL_mutex *g_mix_lock;
 static DSBuf *g_bufs[MAX_BUFFERS];
 static SDL_AudioDeviceID g_dev;
@@ -127,6 +135,20 @@ SHIM(dsb_QueryInterface) {
     if (d1 == 0x279AFA85u || d1 == 0x6825A449u || d1 == 0) { /* IDirectSoundBuffer, IDirectSoundBuffer8, IUnknown */
         hcom_addref(ARG(0));
         M32(ARG(2)) = ARG(0);
+        RET(0, 3);
+    }
+    if (d1 == 0x279AFA84u) { /* IDirectSound3DListener (279afa84-4981-11ce-a521-0020af0be560) */
+        DSBuf *b = B;
+        if (!b->listener) b->listener = hcom_new(&k_ds3dl, b);
+        hcom_addref(b->listener);
+        M32(ARG(2)) = b->listener;
+        RET(0, 3);
+    }
+    if (d1 == 0x279AFA86u) { /* IDirectSound3DBuffer (279afa86-4981-11ce-a521-0020af0be560) */
+        DSBuf *b = B;
+        if (!b->buf3d) b->buf3d = hcom_new(&k_ds3db, b);
+        hcom_addref(b->buf3d);
+        M32(ARG(2)) = b->buf3d;
         RET(0, 3);
     }
     LOG("dsound: QueryInterface for unsupported %08x", d1);
@@ -241,6 +263,146 @@ SHIM(dsb_AcquireResources) { RET(0, 4); }
 SHIM(dsb_GetObjectInPath) { RET(E_NOTIMPL_, 5); }
 #undef B
 
+/* ---------------- IDirectSound3DListener / IDirectSound3DBuffer ---------------- */
+/* The game asks the primary buffer for a listener and every 3D buffer for a 3D
+ * buffer interface, then calls methods on the result *without checking the
+ * HRESULT*: returning E_NOINTERFACE crashed it on a NULL vtable. Both objects
+ * keep their parameters (DS3DLISTENER / DS3DBUFFER layout) and return DS_OK. */
+#define B3 ((DSBuf *)hcom_host(ARG(0)))
+SHIM(ds3d_QueryInterface) { hcom_addref(ARG(0)); M32(ARG(2)) = ARG(0); RET(0, 3); }
+SHIM(ds3d_AddRef) { RET(hcom_addref(ARG(0)), 1); }
+SHIM(ds3d_Release) { uint32_t left; hcom_release(ARG(0), &left); RET(left, 1); }
+
+SHIM(ds3dl_GetAllParameters) {
+    DSBuf *b = B3;
+    uint32_t p = ARG(1);
+    if (p) { uint32_t n = M32(p); if (n > sizeof b->lp) n = sizeof b->lp; memcpy(MEM + p, &b->lp, n); M32(p) = sizeof b->lp; }
+    RET(0, 2);
+}
+SHIM(ds3dl_SetAllParameters) {
+    DSBuf *b = B3;
+    uint32_t p = ARG(1);
+    if (p) { uint32_t n = M32(p); if (n > sizeof b->lp) n = sizeof b->lp; memcpy(&b->lp, MEM + p, n); b->lp.dwSize = sizeof b->lp; }
+    RET(0, 3);
+}
+SHIM(ds3dl_GetDistanceFactor) { if (ARG(1)) MF32(ARG(1)) = B3->lp.dist; RET(0, 2); }
+SHIM(ds3dl_GetDopplerFactor) { if (ARG(1)) MF32(ARG(1)) = B3->lp.dopp; RET(0, 2); }
+SHIM(ds3dl_GetRolloffFactor) { if (ARG(1)) MF32(ARG(1)) = B3->lp.rolloff; RET(0, 2); }
+SHIM(ds3dl_GetOrientation) {
+    DSBuf *b = B3;
+    if (ARG(1)) { MF32(ARG(1)) = b->lp.front[0]; MF32(ARG(1) + 4) = b->lp.front[1]; MF32(ARG(1) + 8) = b->lp.front[2]; }
+    if (ARG(2)) { MF32(ARG(2)) = b->lp.top[0]; MF32(ARG(2) + 4) = b->lp.top[1]; MF32(ARG(2) + 8) = b->lp.top[2]; }
+    RET(0, 3);
+}
+SHIM(ds3dl_GetPosition) {
+    DSBuf *b = B3;
+    if (ARG(1)) { MF32(ARG(1)) = b->lp.pos[0]; MF32(ARG(1) + 4) = b->lp.pos[1]; MF32(ARG(1) + 8) = b->lp.pos[2]; }
+    RET(0, 2);
+}
+SHIM(ds3dl_GetVelocity) {
+    DSBuf *b = B3;
+    if (ARG(1)) { MF32(ARG(1)) = b->lp.vel[0]; MF32(ARG(1) + 4) = b->lp.vel[1]; MF32(ARG(1) + 8) = b->lp.vel[2]; }
+    RET(0, 2);
+}
+SHIM(ds3dl_SetDistanceFactor) { B3->lp.dist = ARGF(1); RET(0, 3); }
+SHIM(ds3dl_SetDopplerFactor) { B3->lp.dopp = ARGF(1); RET(0, 3); }
+SHIM(ds3dl_SetRolloffFactor) { B3->lp.rolloff = ARGF(1); RET(0, 3); }
+SHIM(ds3dl_SetOrientation) {
+    DSBuf *b = B3;
+    b->lp.front[0] = ARGF(1); b->lp.front[1] = ARGF(2); b->lp.front[2] = ARGF(3);
+    b->lp.top[0] = ARGF(4); b->lp.top[1] = ARGF(5); b->lp.top[2] = ARGF(6);
+    RET(0, 8);
+}
+SHIM(ds3dl_SetPosition) {
+    DSBuf *b = B3;
+    b->lp.pos[0] = ARGF(1); b->lp.pos[1] = ARGF(2); b->lp.pos[2] = ARGF(3);
+    RET(0, 5);
+}
+SHIM(ds3dl_SetVelocity) {
+    DSBuf *b = B3;
+    b->lp.vel[0] = ARGF(1); b->lp.vel[1] = ARGF(2); b->lp.vel[2] = ARGF(3);
+    RET(0, 5);
+}
+SHIM(ds3dl_CommitDeferredSettings) { RET(0, 1); }
+
+SHIM(ds3db_GetAllParameters) {
+    DSBuf *b = B3;
+    uint32_t p = ARG(1);
+    if (p) { uint32_t n = M32(p); if (n > sizeof b->bp) n = sizeof b->bp; memcpy(MEM + p, &b->bp, n); M32(p) = sizeof b->bp; }
+    RET(0, 2);
+}
+SHIM(ds3db_SetAllParameters) {
+    DSBuf *b = B3;
+    uint32_t p = ARG(1);
+    if (p) { uint32_t n = M32(p); if (n > sizeof b->bp) n = sizeof b->bp; memcpy(&b->bp, MEM + p, n); b->bp.dwSize = sizeof b->bp; }
+    RET(0, 3);
+}
+SHIM(ds3db_GetConeAngles) {
+    DSBuf *b = B3;
+    if (ARG(1)) M32(ARG(1)) = b->bp.inside;
+    if (ARG(2)) M32(ARG(2)) = b->bp.outside;
+    RET(0, 3);
+}
+SHIM(ds3db_SetConeAngles) { B3->bp.inside = ARG(1); B3->bp.outside = ARG(2); RET(0, 4); }
+SHIM(ds3db_GetConeOrientation) {
+    DSBuf *b = B3;
+    if (ARG(1)) { MF32(ARG(1)) = b->bp.cone[0]; MF32(ARG(1) + 4) = b->bp.cone[1]; MF32(ARG(1) + 8) = b->bp.cone[2]; }
+    RET(0, 2);
+}
+SHIM(ds3db_SetConeOrientation) {
+    DSBuf *b = B3;
+    b->bp.cone[0] = ARGF(1); b->bp.cone[1] = ARGF(2); b->bp.cone[2] = ARGF(3);
+    RET(0, 5);
+}
+SHIM(ds3db_GetConeOutsideVolume) { if (ARG(1)) M32(ARG(1)) = (uint32_t)B3->bp.cone_vol; RET(0, 2); }
+SHIM(ds3db_SetConeOutsideVolume) { B3->bp.cone_vol = (int32_t)ARG(1); RET(0, 3); }
+SHIM(ds3db_GetMaxDistance) { if (ARG(1)) MF32(ARG(1)) = B3->bp.max_dist; RET(0, 2); }
+SHIM(ds3db_SetMaxDistance) { B3->bp.max_dist = ARGF(1); RET(0, 3); }
+SHIM(ds3db_GetMinDistance) { if (ARG(1)) MF32(ARG(1)) = B3->bp.min_dist; RET(0, 2); }
+SHIM(ds3db_SetMinDistance) { B3->bp.min_dist = ARGF(1); RET(0, 3); }
+SHIM(ds3db_GetMode) { if (ARG(1)) M32(ARG(1)) = B3->bp.mode; RET(0, 2); }
+SHIM(ds3db_SetMode) { B3->bp.mode = ARG(1); RET(0, 3); }
+SHIM(ds3db_GetPosition) {
+    DSBuf *b = B3;
+    if (ARG(1)) { MF32(ARG(1)) = b->bp.pos[0]; MF32(ARG(1) + 4) = b->bp.pos[1]; MF32(ARG(1) + 8) = b->bp.pos[2]; }
+    RET(0, 2);
+}
+SHIM(ds3db_SetPosition) {
+    DSBuf *b = B3;
+    b->bp.pos[0] = ARGF(1); b->bp.pos[1] = ARGF(2); b->bp.pos[2] = ARGF(3);
+    RET(0, 5);
+}
+SHIM(ds3db_GetVelocity) {
+    DSBuf *b = B3;
+    if (ARG(1)) { MF32(ARG(1)) = b->bp.vel[0]; MF32(ARG(1) + 4) = b->bp.vel[1]; MF32(ARG(1) + 8) = b->bp.vel[2]; }
+    RET(0, 2);
+}
+SHIM(ds3db_SetVelocity) {
+    DSBuf *b = B3;
+    b->bp.vel[0] = ARGF(1); b->bp.vel[1] = ARGF(2); b->bp.vel[2] = ARGF(3);
+    RET(0, 5);
+}
+#undef B3
+
+static const ShimFn k_ds3dl_fns[] = {
+    shim_ds3d_QueryInterface, shim_ds3d_AddRef, shim_ds3d_Release,
+    shim_ds3dl_GetAllParameters, shim_ds3dl_GetDistanceFactor, shim_ds3dl_GetDopplerFactor,
+    shim_ds3dl_GetOrientation, shim_ds3dl_GetPosition, shim_ds3dl_GetRolloffFactor,
+    shim_ds3dl_GetVelocity, shim_ds3dl_SetAllParameters, shim_ds3dl_SetDistanceFactor,
+    shim_ds3dl_SetDopplerFactor, shim_ds3dl_SetOrientation, shim_ds3dl_SetPosition,
+    shim_ds3dl_SetRolloffFactor, shim_ds3dl_SetVelocity, shim_ds3dl_CommitDeferredSettings,
+};
+
+static const ShimFn k_ds3db_fns[] = {
+    shim_ds3d_QueryInterface, shim_ds3d_AddRef, shim_ds3d_Release,
+    shim_ds3db_GetAllParameters, shim_ds3db_GetConeAngles, shim_ds3db_GetConeOrientation,
+    shim_ds3db_GetConeOutsideVolume, shim_ds3db_GetMaxDistance, shim_ds3db_GetMinDistance,
+    shim_ds3db_GetMode, shim_ds3db_GetPosition, shim_ds3db_GetVelocity,
+    shim_ds3db_SetAllParameters, shim_ds3db_SetConeAngles, shim_ds3db_SetConeOrientation,
+    shim_ds3db_SetConeOutsideVolume, shim_ds3db_SetMaxDistance, shim_ds3db_SetMinDistance,
+    shim_ds3db_SetMode, shim_ds3db_SetPosition, shim_ds3db_SetVelocity,
+};
+
 static const ShimFn k_dsb_fns[] = {
     shim_dsb_QueryInterface, shim_dsb_AddRef, shim_dsb_Release, shim_dsb_GetCaps, shim_dsb_GetCurrentPosition,
     shim_dsb_GetFormat, shim_dsb_GetVolume, shim_dsb_GetPan, shim_dsb_GetFrequency, shim_dsb_GetStatus,
@@ -261,6 +423,14 @@ SHIM(ds_CreateSoundBuffer) {
     b->flags = M32(desc + 4);
     b->primary = (b->flags & 1) != 0;
     b->channels = 2; b->bits = 16; b->rate = 44100;
+    /* DS3DLISTENER / DS3DBUFFER defaults */
+    b->lp.dwSize = sizeof b->lp;
+    b->lp.front[2] = 1.0f; b->lp.top[1] = 1.0f;
+    b->lp.dist = b->lp.dopp = b->lp.rolloff = 1.0f;
+    b->bp.dwSize = sizeof b->bp;
+    b->bp.inside = b->bp.outside = 360;
+    b->bp.cone[2] = 1.0f;
+    b->bp.min_dist = 1.0f; b->bp.max_dist = 1.0e9f;
     uint32_t wfx = M32(desc + 16);
     if (wfx) { b->channels = M16(wfx + 2); b->rate = (int)M32(wfx + 4); b->bits = M16(wfx + 14); }
     if (!b->primary) {
@@ -288,6 +458,8 @@ SHIM(ds_DuplicateSoundBuffer) {
     b->d->refs++;
     b->playing = 0;
     b->pos = 0;
+    b->listener = 0;
+    b->buf3d = 0;
     M32(ARG(2)) = buf_register(b);
     RET(0, 3);
 }
@@ -309,6 +481,8 @@ SHIM(DirectSoundCreate8) {
     if (!init) {
         hcom_class_init(&k_ds8, "IDirectSound8", k_ds_fns, sizeof k_ds_fns / sizeof k_ds_fns[0]);
         hcom_class_init(&k_dsb, "IDirectSoundBuffer8", k_dsb_fns, sizeof k_dsb_fns / sizeof k_dsb_fns[0]);
+        hcom_class_init(&k_ds3dl, "IDirectSound3DListener", k_ds3dl_fns, sizeof k_ds3dl_fns / sizeof k_ds3dl_fns[0]);
+        hcom_class_init(&k_ds3db, "IDirectSound3DBuffer", k_ds3db_fns, sizeof k_ds3db_fns / sizeof k_ds3db_fns[0]);
         audio_open();
         init = 1;
     }
