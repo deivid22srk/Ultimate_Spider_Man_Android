@@ -121,6 +121,16 @@ jobs:
           sha256: $sha
           Install on arm64 Android 9+ and point the launcher at your own copy of the game."
           echo "published to https://github.com/$GEN_REPO/releases/tag/$tag"
+          {
+            echo "### Full APK built"
+            echo ""
+            echo "Download: https://github.com/$GEN_REPO/releases/tag/$tag"
+            echo ""
+            echo "sha256: \`$sha\`"
+            echo ""
+            echo "It is a **private** release on purpose: the APK contains the recompiled"
+            echo "game code, so it never appears as an artifact of this public repository."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       # App-only build: safe to hand out publicly (contains no game code).
       - uses: actions/upload-artifact@v4

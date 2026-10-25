@@ -95,6 +95,11 @@ uint32_t gmalloc(uint32_t n) {
 
 void gfree(uint32_t p) {
     if (!p) return;
+    if (p < GUEST_HEAP_BASE || p >= GUEST_HEAP_END) {
+        static int warned;
+        if (warned++ < 10) LOG("gfree(%08x): not a guest heap pointer", p);
+        return;
+    }
     pthread_mutex_lock(&g_heap_lock);
     uint32_t b = p - HDR;
     if (!BUSED(b)) {
@@ -134,7 +139,13 @@ void gfree(uint32_t p) {
 }
 
 uint32_t gsize(uint32_t p) {
-    return p ? BSIZE(p - HDR) - HDR : 0;
+    if (!p) return 0;
+    if (p < GUEST_HEAP_BASE || p >= GUEST_HEAP_END) {
+        static int warned;
+        if (warned++ < 10) LOG("gsize(%08x): not a guest heap pointer", p);
+        return 0;
+    }
+    return BSIZE(p - HDR) - HDR;
 }
 
 uint32_t grealloc(uint32_t p, uint32_t n) {

@@ -176,13 +176,27 @@ SHIM(_flushall) { fflush(NULL); RETC(0); }
 
 SHIM(_msize) { RETC(gsize(ARG(0))); }
 
+/* MSVC's _aligned_malloc stores the base block pointer immediately before the
+ * aligned pointer. The game relies on it: its operator new calls
+ * _msize(*(uint32_t *)(p - 4)) to account the real block size, and
+ * _aligned_free frees that base pointer. Returning a plain malloc pointer here
+ * made [p-4] a heap size (e.g. 0x3d11) and _msize() then crashed. */
 SHIM(_aligned_malloc) {
-    uint32_t align = ARG(1);
-    if (align > 16) LOG("msvcr71 _aligned_malloc(%u, %u): 16-byte alignment", ARG(0), align);
-    RETC(gmalloc(ARG(0) ? ARG(0) : 1));
+    uint32_t size = ARG(0), align = ARG(1);
+    if (align < 8) align = 8;
+    if (align & (align - 1)) rt_fatal("msvcr71 _aligned_malloc: alignment %u is not a power of two", align);
+    uint32_t base = gmalloc(size + align + 8);
+    if (!base) RETC(0);
+    uint32_t p = (base + 4 + align - 1) & ~(align - 1);
+    M32(p - 4) = base;
+    RETC(p);
 }
 
-SHIM(_aligned_free) { gfree(ARG(0)); RETC(0); }
+SHIM(_aligned_free) {
+    uint32_t p = ARG(0);
+    if (p) gfree(M32(p - 4));
+    RETC(0);
+}
 
 /* ====================================================================== */
 /* msvcr71: strings, numbers, time                                        */
