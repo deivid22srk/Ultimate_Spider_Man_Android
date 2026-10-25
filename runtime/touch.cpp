@@ -7,11 +7,15 @@
 // Sync" item in Options > Video Settings becomes "Touch Controls" and shows
 // or hides the overlay (vsync itself is then always on, see d3d9_bridge.cpp).
 #include "d3d9_bridge.h"
+#include "art.h"
 #include <SDL2/SDL.h>
 #include <sys/stat.h>
 #include <dirent.h>
 #include <errno.h>
 #include <strings.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <cmath>
 #include <string>
 
@@ -33,6 +37,8 @@ const Button k_buttons[] = {
 };
 const int NB = sizeof k_buttons / sizeof k_buttons[0];
 const float STICK_X = 0.24f, STICK_Y = -0.26f, STICK_R = 0.17f; // from bottom-left
+// the camera zone has no widget, only this hint, shown while a finger drags
+const float CAMPAD_X = 0.70f, CAMPAD_Y = 0.44f, CAMPAD_R = 0.17f; // from top-left
 
 struct Finger { SDL_FingerID id; int button; bool stick; bool look; bool ptr; float x, y; bool used; };
 Finger g_fingers[10];
@@ -42,9 +48,9 @@ bool g_touch_on = true;       // the player's choice, kept in <save>/touch.cfg
 uint16_t g_buttons;
 float g_aspect = 16.f / 9.f;  // width / height of the screen
 // Touch pointer (GAME_USM): where the last pointer finger landed, for the
-// on-screen marker.
+// on-screen cursor, and when the camera zone was last dragged, for its hint.
 float g_ptr_x = 0.5f, g_ptr_y = 0.5f;
-uint32_t g_ptr_ms;
+uint32_t g_ptr_ms, g_look_ms;
 
 // The game's VSync option byte, which the menu toggles and the settings save.
 const uint32_t G_VSYNC_OPTION = 0x9D0F3C;
@@ -209,6 +215,7 @@ extern "C" void touch_handle_event(const SDL_Event *e) {
         g_ptr_x = x;
         g_ptr_y = y;
         g_ptr_ms = SDL_GetTicks();
+        g_look_ms = g_ptr_ms;
     }
 #endif
     f->x = x;
@@ -258,6 +265,88 @@ void quad(Vtx *v, float cx, float cy, float r, float w, float h, uint32_t color)
                 {x0, y1, 0, 1, color, 0, 1}, {x1, y1, 0, 1, color, 1, 1}};
     v[0] = q[0]; v[1] = q[1]; v[2] = q[2];
     v[3] = q[2]; v[4] = q[1]; v[5] = q[3];
+}
+
+// ---- HUD art: the icon pack, unzipped to <game>/port/icons/ ---------------
+//
+// Every file is a 256x256 RGBA PNG (the artist's spec is in the repo's docs,
+// and a copy of it sits next to the ZIP). runtime/art.c packs them into one
+// atlas texture, so the whole overlay stays one draw call per texture, and
+// every icon is optional: whatever is missing keeps the procedural disc the
+// overlay has always drawn.
+ArtEntry g_art[ART_MAX];
+int g_nart;
+IDirect3DTexture9 *g_atlas;
+bool g_art_tried;
+
+// The eight overlay buttons wear the icon of the action they press, in the
+// order of k_buttons (input.c's k_usm_keys -> the game's binding table:
+// A jump, B web, X punch, Y kick, LB wall crawl, RB black, Start pause,
+// Back back).
+const char *k_button_icon[NB] = {"jump", "web", "punch", "kick", "wallcrawl", "black", "pause", "back"};
+
+const ArtEntry *art(const char *key) {
+    for (int i = 0; i < g_nart; i++)
+        if (!strcmp(g_art[i].key, key)) return &g_art[i];
+    return nullptr;
+}
+
+// <game>/port/icons, and (in case the ZIP was unpacked flat) <game>/port itself
+void icons_dirs(std::string *out, int *n) {
+    extern char g_save_dir[1024];
+    std::string port(g_save_dir);
+    size_t l = port.size();
+    if (l > 5 && port.compare(l - 5, 5, "/save") == 0) port.resize(l - 5);
+    out[(*n)++] = port + "/icons";
+    out[(*n)++] = port;
+    out[(*n)++] = "icons";
+    out[(*n)++] = ".";
+}
+
+void load_atlas(IDirect3DDevice9 *d) {
+    g_art_tried = true;
+    std::string dir[8];
+    const char *cd[8];
+    int nd = 0;
+    icons_dirs(dir, &nd);
+    for (int i = 0; i < nd; i++) cd[i] = dir[i].c_str();
+    uint8_t *buf = nullptr;
+    int aw = 0, ah = 0;
+    g_nart = art_load(cd, nd, g_art, ART_MAX, &buf, &aw, &ah);
+    if (!g_nart || !buf) {
+        LOG("touch: no HUD icon pack in %s (drawing the plain overlay)", dir[0].c_str());
+        return;
+    }
+    if (FAILED(d->CreateTexture(aw, ah, 1, 0, D3DFMT_A8R8G8B8, D3DPOOL_MANAGED, &g_atlas, nullptr))) {
+        free(buf);
+        g_nart = 0;
+        LOG("touch: icon atlas texture failed");
+        return;
+    }
+    D3DLOCKED_RECT lr;
+    if (SUCCEEDED(g_atlas->LockRect(0, &lr, nullptr, 0))) {
+        for (int y = 0; y < ah; y++)
+            memcpy((uint8_t *)lr.pBits + (size_t)y * lr.Pitch, buf + (size_t)y * aw * 4, (size_t)aw * 4);
+        g_atlas->UnlockRect(0);
+    }
+    free(buf);
+    LOG("touch: %d HUD icons loaded from %s", g_nart, dir[0].c_str());
+}
+
+// one icon, centred on (cx,cy), half-size r in screen-height units
+void art_quad(Vtx *v, const ArtEntry *a, float cx, float cy, float r, float w, float h, uint32_t color) {
+    float ax = r / g_aspect * w, ay = r * h, px = cx * w, py = cy * h;
+    Vtx q[4] = {{px - ax, py - ay, 0, 1, color, a->u0, a->v0}, {px + ax, py - ay, 0, 1, color, a->u1, a->v0},
+                {px - ax, py + ay, 0, 1, color, a->u0, a->v1}, {px + ax, py + ay, 0, 1, color, a->u1, a->v1}};
+    v[0] = q[0]; v[1] = q[1]; v[2] = q[2];
+    v[3] = q[2]; v[4] = q[1]; v[5] = q[3];
+}
+
+// the cursor art carries its tip at (16,16) of 256, so the quad is shifted so
+// that the tip lands exactly on the pointer
+void cursor_quad(Vtx *v, const ArtEntry *a, float cx, float cy, float r, float w, float h, uint32_t color) {
+    float off = r * (112.f / 128.f); /* tip -> centre, in the same units as r */
+    art_quad(v, a, cx + off / g_aspect, cy + off, r, w, h, color);
 }
 } // namespace
 
@@ -312,32 +401,58 @@ void touch_draw(IDirect3DDevice9 *d) {
     d->SetSamplerState(0, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP);
     d->SetSamplerState(0, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP);
 
-    Vtx v[6 * (NB + 4)];
-    int n = 0;
+    if (!g_art_tried) load_atlas(d);
+
+    /* Two batches: the plain discs (sampler from the soft-edged texture) and
+     * the artist's icons (from the atlas). Each is one DrawPrimitiveUP. */
+    Vtx vd[6 * (NB + 4)], va[6 * (ART_MAX + 8)];
+    int nd = 0, na = 0;
     float sx, sy;
     stick_pos(&sx, &sy);
-    quad(v + 6 * n++, sx, sy, STICK_R, w, h, 0x90FFFFFF);
-    quad(v + 6 * n++, sx + g_stick_x * STICK_R / g_aspect, sy + g_stick_y * STICK_R, STICK_R * 0.45f, w, h,
-         0xD0FFFFFF);
+    const ArtEntry *a;
+    if ((a = art("stick"))) art_quad(va + 6 * na++, a, sx, sy, STICK_R * 1.05f, w, h, 0xFFFFFFFF);
+    else quad(vd + 6 * nd++, sx, sy, STICK_R, w, h, 0x90FFFFFF);
+    float kx = sx + g_stick_x * STICK_R / g_aspect, ky = sy + g_stick_y * STICK_R;
+    if ((a = art("knob"))) art_quad(va + 6 * na++, a, kx, ky, STICK_R * 0.47f, w, h, 0xFFFFFFFF);
+    else quad(vd + 6 * nd++, kx, ky, STICK_R * 0.45f, w, h, 0xD0FFFFFF);
     for (int i = 0; i < NB; i++) {
         float bx, by;
         button_pos(k_buttons[i], &bx, &by);
-        uint32_t col = k_buttons[i].color;
-        uint32_t a = (g_buttons & k_buttons[i].bit) ? 0xF0 : 0x90;
-        quad(v + 6 * n++, bx, by, k_buttons[i].r, w, h, (col & 0xFFFFFF) | a << 24);
+        bool on = (g_buttons & k_buttons[i].bit) != 0;
+        char key[32];
+        snprintf(key, sizeof key, "on/%s", k_button_icon[i]);
+        const ArtEntry *b = art(on ? key : k_button_icon[i]);
+        if (b) art_quad(va + 6 * na++, b, bx, by, k_buttons[i].r * 1.06f, w, h, on ? 0xFFFFFFFF : 0xE0FFFFFF);
+        else quad(vd + 6 * nd++, bx, by, k_buttons[i].r, w, h, (k_buttons[i].color & 0xFFFFFF) | (on ? 0xF0u : 0x90u) << 24);
     }
 #ifdef GAME_USM
+    /* Camera zone hint: only while the finger is dragging there, so nothing
+     * permanent sits in the middle of the screen. */
+    uint32_t lookage = SDL_GetTicks() - g_look_ms;
+    if ((a = art("campad")) && g_look_ms && lookage < 900)
+        art_quad(va + 6 * na++, a, CAMPAD_X, CAMPAD_Y, CAMPAD_R, w, h,
+                 (uint32_t)((900 - lookage) * 0xB0 / 900) << 24 | 0xFFFFFF);
     /* Where the finger last landed: the menus are clicked through the virtual
-     * system cursor, so this tells the player where that cursor now is (the
-     * game's own pointer, when it draws one, sits at the same spot). */
+     * system cursor, so this is where that cursor now is (the game's own
+     * pointer, when it draws one, sits at the same spot). */
     uint32_t age = SDL_GetTicks() - g_ptr_ms;
-    if (g_ptr_ms && age < 700) {
-        uint32_t a = (uint32_t)((700 - age) * 0xC0 / 700);
-        quad(v + 6 * n++, g_ptr_x, g_ptr_y, 0.032f, w, h, 0xFFFFFF | a << 24);
-        quad(v + 6 * n++, g_ptr_x, g_ptr_y, 0.013f, w, h, 0xFFFFFF | a << 24);
+    if (g_ptr_ms && age < 1500) {
+        uint32_t al = (uint32_t)((1500 - age) * 0xFF / 1500);
+        if ((a = art("cursor"))) cursor_quad(va + 6 * na++, a, g_ptr_x, g_ptr_y, 0.055f, w, h, al << 24 | 0xFFFFFF);
+        else {
+            quad(vd + 6 * nd++, g_ptr_x, g_ptr_y, 0.032f, w, h, 0xFFFFFF | (al * 0xC0 / 0xFF) << 24);
+            quad(vd + 6 * nd++, g_ptr_x, g_ptr_y, 0.013f, w, h, 0xFFFFFF | (al * 0xC0 / 0xFF) << 24);
+        }
     }
 #endif
-    d->DrawPrimitiveUP(D3DPT_TRIANGLELIST, 2 * n, v, sizeof(Vtx));
+    if (nd) {
+        d->SetTexture(0, g_tex);
+        d->DrawPrimitiveUP(D3DPT_TRIANGLELIST, 2 * nd, vd, sizeof(Vtx));
+    }
+    if (na && g_atlas) {
+        d->SetTexture(0, g_atlas);
+        d->DrawPrimitiveUP(D3DPT_TRIANGLELIST, 2 * na, va, sizeof(Vtx));
+    }
     d->EndScene();
     d->SetRenderTarget(0, old);
     if (old) old->Release();

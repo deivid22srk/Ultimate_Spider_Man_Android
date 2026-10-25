@@ -28,6 +28,9 @@ Actions (NDK 27.2.12479018, clang 18).
 | background/resume | `platform_pump_events()` keeps the SDL pump alive while the game idles in `PeekMessageA` | no freeze after `e08b5ae` |
 | keyboard injection reaches the game | `key down/up vk=.. sc=..` + `dinput: keyboard poll #N` lines in `port/log.txt` | game reacts to scripted keys after `a3dd136` |
 | action binding table and input model | `llvm-objdump` call-site scan of the whole image | `docs/RECON.md` §11b, every row has a call site |
+| PNG reader (`runtime/png.c`) | host build with `clang`, decoding all 58 files of the icon pack | dimensions and an FNV-1a of the RGBA bytes match an independent Python decoder byte for byte |
+| icon packing (`runtime/art.c`) | `clang -o arttest tools/art_test.c runtime/art.c runtime/png.c -lz` against the real pack | 21/21 icons, 1024x1536 atlas, every atlas cell byte-identical to its source PNG (B,G,R,A order), UVs select the right cell |
+| Option A builds | Actions run `40234915350` | success; the earlier run `40233580512` had failed to link (`(anonymous namespace)::user32_pointer_fingers`), which `tools/check_c_linkage.sh` now catches locally |
 
 ## Implemented but not tested
 
@@ -39,7 +42,9 @@ Actions (NDK 27.2.12479018, clang 18).
 | `VK_LBUTTON`/`VK_RBUTTON`/`VK_MBUTTON` mirrored into `user32_vk_states()` | same |
 | Right-stick mouse deltas now gated to one per presented frame (were injected ~1 kHz) | the over-injection was a code-reading finding, not a measured one; needs a run with a real pad |
 | Touch marker drawn at the last touch point (fades after 700 ms) | needs a screenshot |
-| Contextual HUD icons (`/storage/emulated/0/port/ICONES_HUD_SPEC.md`) | art not generated yet |
+| HUD drawn from the artist's icon pack (`runtime/touch.cpp` + `runtime/art.c`) | compiles and packs offline, but no APK has drawn it yet; the run writes `touch: N HUD icons loaded from ...` to `port/log.txt`, which is how it will be confirmed |
+| Icons pressed state (`on/hud_*_on.png`) and the camera-zone hint | same run |
+| "Contextual" part of the HUD (show/hide and swap icons by game state) | not implemented: none of the game-state signals (level pointer, Bink playback, ShowCursor count) is wired yet |
 | Android launcher (folder validation, SHA-1 check, options) | only exercised by hand so far |
 | `runtime/usm_shims.c` CRT/dialog/image-list shims beyond the exercised paths | compiles, but not every shim has been hit by real game code |
 | `tools/difftest.py` (lifter self-test) | `unicorn` does not build in this Termux/Android environment; run it on a normal Linux host |

@@ -15,4 +15,4 @@ target_include_directories(main PRIVATE ${PORT}/runtime ${PORT}/gen ../sdlinc
 target_compile_definitions(main PRIVATE DXVK_NATIVE GAME_USM)
 target_compile_options(main PRIVATE -O2 -fno-strict-aliasing -fwrapv -fsigned-char -Wno-everything
     $<$<COMPILE_LANGUAGE:C>:-std=gnu11>)
-target_link_libraries(main PRIVATE SDL2 dxvk_d3d9 m $<$<BOOL:${ANDROID}>:log>)
+target_link_libraries(main PRIVATE SDL2 dxvk_d3d9 m z $<$<BOOL:${ANDROID}>:log>)

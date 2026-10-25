@@ -16,7 +16,7 @@ CXX_SRC = $(wildcard runtime/*.cpp)
 CXX_OBJ = $(patsubst runtime/%.cpp,build/rt/%.o,$(CXX_SRC))
 
 build/lb: $(GEN_OBJ) $(RT_OBJ) $(CXX_OBJ)
-	$(CXX) -rdynamic -o $@ $^ -lm -lpthread $(shell sdl2-config --libs) -L$(DXVK_LIB) -ldxvk_d3d9 -Wl,-rpath,$(DXVK_LIB)
+	$(CXX) -rdynamic -o $@ $^ -lm -lpthread -lz $(shell sdl2-config --libs) -L$(DXVK_LIB) -ldxvk_d3d9 -Wl,-rpath,$(DXVK_LIB)
 
 build/gen/%.o: gen/%.c
 	@mkdir -p build/gen

@@ -30,7 +30,7 @@ for f in runtime/*.cpp; do
         -Iandroid/app/jni/dxvk/include/native/windows -DDXVK_NATIVE \
         -I/tmp/opencode/sdlink_inc -Wno-everything -c "$f" -o "$o"
     # undefined symbols that look like a runtime C symbol but are mangled
-    hits=$(llvm-nm -u "$o" | grep -E '_Z.*(user32_|platform_|input_|usm_)' || true)
+    hits=$(llvm-nm -u "$o" | grep -E '_Z.*(user32_|platform_|input_|usm_|art_|png_)' || true)
     if [ -n "$hits" ]; then
         echo "!! $f calls the C runtime through a mangled name:"
         echo "$hits"
