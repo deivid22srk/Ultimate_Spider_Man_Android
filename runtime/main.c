@@ -343,11 +343,12 @@ static void check_game_dir(void) {
         rt_fatal("cannot open the game folder %s: %s (%s). Copy the contents of the "
                  GAME_TITLE " install folder into it.", g_game_dir, why, strerror(e));
     }
-#ifdef GAME_SKYRIM
+#ifdef GAME_USM
+    /* Ultimate Spider-Man: the exe, Bink, and the asset folders the game opens
+     * (data/packs holds the 1.6 GB of level/character packs). */
+    static const char *const k_need[] = {GAME_EXE, "binkw32.dll", "data", "data/packs", NULL};
+#elif defined(GAME_SKYRIM)
     static const char *const k_need[] = {GAME_EXE, DLL_D3DX9, DLL_EXTRA, "X3DAudio1_7.dll", "Data", NULL};
-#elif defined(GAME_USM)
-    /* Ultimate Spider-Man: the exe, Bink, and the asset folder it opens. */
-    static const char *const k_need[] = {GAME_EXE, "binkw32.dll", "data", NULL};
 #else
     static const char *const k_need[] = {GAME_EXE, DLL_D3DX9, DLL_EXTRA, NULL};
 #endif
@@ -357,6 +358,9 @@ static void check_game_dir(void) {
             if (missing[0]) strncat(missing, ", ", sizeof missing - strlen(missing) - 1);
             strncat(missing, k_need[i], sizeof missing - strlen(missing) - 1);
         }
+#ifdef GAME_USM
+    int dats = 1; /* USM keeps its assets in data/ (packs, Sound, movies) */
+#else
     int dats = 0;
     DIR *d = opendir(".");
     for (struct dirent *de; d && (de = readdir(d));) {
@@ -364,6 +368,7 @@ static void check_game_dir(void) {
         if (n >= 8 && !strncasecmp(de->d_name, "GAME", 4) && !strcasecmp(de->d_name + n - 4, ".DAT")) dats++;
     }
     if (d) closedir(d);
+#endif
 #ifdef GAME_SKYRIM
     {   /* 0.2: report whether the data folder is readable (0.1 found no archives on a phone) */
         static const char *const k_probe[] = {"Data", "Data/Skyrim.esm", "Data/Skyrim - Misc.bsa", NULL};
@@ -449,8 +454,9 @@ int main(int argc, char **argv) {
         extern unsigned rt_module_count(unsigned);
         if (rt_module_count(0) == 0)
             rt_fatal("this APK was built without the recompiled game code (app-only build). "
-                     "Build gen/ from your own copy with tools/regen_gen.sh and use the "
-                     "workflow's gen_release input, or build the full APK yourself.");
+                     "Build gen/ from your own copy with tools/regen_gen.sh, then build the full "
+                     "APK in a private fork of the repository (or locally) - see README, "
+                     "\"Building the full APK\".");
     }
 #endif
 #ifdef GAME_MARVEL

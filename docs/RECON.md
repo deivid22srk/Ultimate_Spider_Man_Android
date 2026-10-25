@@ -219,12 +219,12 @@ Because the game imports no D3DX and no Xerces, the recompiled-code surface is
 `USM.exe` (4.6 MB of `.text`) plus `binkw32.dll` (283 KB of code). That is
 about 40% of the Skyrim reference's code volume.
 
-## 11. Discovery results (measured on this machine)
+## 11. Discovery and lifting results (measured on this machine)
 
 Machine: Qualcomm SM8350 (Snapdragon 888), 8 cores, 7.3 GB RAM, Android/Termux
 with `python3.14` + `capstone 5.0.7` + `pefile`.
 
-`binkw32.dll` (reference run, 283,277 bytes of code):
+`binkw32.dll` (283,277 bytes of code, image base rebased to `0x09000000`):
 
 ```
 tail-call starts 252
@@ -232,12 +232,40 @@ text relocs 303, 151 in jump tables skipped
 gap round 0 added 7 ... gaps 196 gap bytes 76454
 functions 787  bad data roots 75308  jump tables 46  unresolved indirect jmps 5
 text bytes 283277 covered 203743 cc/nop bytes 4632
-real 0m13.7s
+discovery 13.7 s
+lifted 780, rejected 7 (junk opcodes)
+gen: 24 C files, 6.4 MB, 31 s
 ```
 
-`USM.exe` discovery: see `docs/RECON_USM_DISCOVERY.md` (generated when the
-run finishes; the numbers — function count, coverage, jump tables, unresolved
-indirect jumps — are the input to the risk assessment in §12).
+`USM.exe` (4,644,864 bytes of code, image base `0x00400000`):
+
+```
+text relocs 0, 0 in jump tables skipped
+gap round 0 added 5486
+call closure round 0 added 14
+gaps 1179  gap bytes 54236
+functions 44032  bad data roots 17966  jump tables 360  unresolved indirect jmps 345
+text bytes 4644864 covered 4334101  cc/nop bytes 271598
+coverage 93.3 %  (gap bytes 1.2 %, alignment/padding 5.8 %)
+discovery ~20 min, peak RSS ~0.5 GB (DISCOVER_CACHE=60000)
+```
+
+Lifting `USM.exe` (`tools/lift.py analysis/functions_usm.json gen exe`):
+
+```
+lifted 43825  rejected 207 (0.47 %)
+rejections: MMX/pf* instructions 83, junk/privileged opcodes 97, segment regs 27
+gen: 90 C files, 120 MB, 43825 entries in g_fn_table_exe, ~5.5 min
+```
+
+The 207 rejected functions contain instructions the lifter does not implement
+(mostly MMX SIMD inside CRT/string helpers and stray data decoded as code). They
+are logged by name at lift time and are the first candidates for
+`HOST_OVERRIDES_USM` if one is ever called.
+
+`clang -fsyntax-only` on the lifted output (representative files, including the
+17 MB translation unit) is clean; the only diagnostics are the lifter's
+`-Wparentheses-equality` idiom, silenced by `-w` in the build.
 
 ## 12. Risk plan
 

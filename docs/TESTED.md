@@ -17,14 +17,18 @@ pefile, clang 20.
 | D3D9 / DirectSound / Bink identification | imports + strings | D3D9, DirectSound8, Bink 1.7d |
 | `discover.py` on `binkw32.dll` | 283,277 bytes of code | 787 functions, 46 jump tables, 13.7 s |
 | `lift.py` on `binkw32.dll` | 780 functions | 24 C files, 6.4 MB, 31 s |
-| lifted C is valid C | `clang -fsyntax-only` on `gen/bink_00.c` | exit 0 |
-| runtime compiles for this game | `clang -fsyntax-only -DGAME_USM` on `runtime/modules.c`, `main.c`, `shims.c`, `platform_sdl.c`, `touch.cpp` | exit 0 |
+| `discover.py` on `USM.exe` | 4,644,864 bytes of code | 44,032 functions, 360 jump tables, 93.3 % coverage, ~20 min |
+| `lift.py` on `USM.exe` | 44,032 functions discovered | 43,825 lifted, 207 rejected, 90 C files, 120 MB, ~5.5 min |
+| lifted C is valid C | `clang -fsyntax-only` on `gen/bink_00.c`, `gen/exe_00.c` and `gen/exe_33.c` (17 MB TU) | exit 0 |
+| runtime compiles for this game | `clang -fsyntax-only -DGAME_USM` on `runtime/modules.c`, `main.c`, `shims.c`, `msvcrt.c`, `usm_shims.c`, `platform_sdl.c`, `touch.cpp` | exit 0 |
+| every `USM.exe` import has a shim | script diffing `IMAGE_DIRECTORY_ENTRY_IMPORT` against the runtime's shim tables (`msvcr71` aliased to the `msvcrt` table) | 0 missing (binkw32/d3d9 excluded: recompiled, not shimmed) |
 
 ## Implemented but not tested
 
 | What | Why not |
 |---|---|
 | Runtime Win32/D3D9/DirectSound shims for this game | needs the full `gen/` and an APK run |
+| `runtime/usm_shims.c` (msvcr71/msvcp71 CRT, std::string/exception ABI, dialogs, image lists) | compiles, but no shim has been exercised against real game code yet |
 | Android launcher (folder validation, SHA-1 check, options) | needs an APK |
 | Touch overlay / controller mapping | needs an APK |
 | CI workflow (`.github/workflows/build.yml`) | see the Actions run referenced in the final report |
