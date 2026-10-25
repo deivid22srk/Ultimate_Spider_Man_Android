@@ -1,0 +1,48 @@
+# --- game files: never versioned -------------------------------------------
+# The user's own copy of the game is never part of this repository.
+*.exe
+*.dll
+*.asi
+*.zip
+*.7z
+*.iso
+*.bin
+*.bik
+*.WBK
+*.PAK
+*.usm
+*.dat
+Game*/
+game/
+Ultimate_Spider_Man*/
+Data/
+data/
+
+# --- generated from the game: never versioned ------------------------------
+# gen/ is recompiled machine code derived from USM.exe and binkw32.dll.
+gen/
+analysis/
+*.o
+*.a
+*.so
+build/
+desktop/build/
+
+# --- android ---------------------------------------------------------------
+.gradle/
+local.properties
+android/.idea/
+android/app/build/
+android/build/
+*.apk
+*.aab
+*.keystore
+*.jks
+.cxx/
+
+# --- misc ------------------------------------------------------------------
+__pycache__/
+*.pyc
+port/
+log.txt
+.DS_Store

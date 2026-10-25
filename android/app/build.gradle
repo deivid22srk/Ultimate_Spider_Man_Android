@@ -1,0 +1,47 @@
+apply plugin: 'com.android.application'
+
+android {
+    namespace "com.deivid22srk.usm"
+    compileSdkVersion 34
+    ndkVersion project.hasProperty('ndkVersion') ? project.property('ndkVersion') : null
+    defaultConfig {
+        applicationId "com.deivid22srk.usm"
+        minSdkVersion 28
+        targetSdkVersion 29  // legacy storage: plain file access with the normal storage prompt
+        versionCode 1
+        versionName "0.1"
+        externalNativeBuild {
+            cmake {
+                arguments "-DANDROID_STL=c++_shared", "-DANDROID_PLATFORM=android-28",
+                        "-DLB_GEN_JOBS=" + (project.findProperty('lbGenJobs') ?: '3')
+                abiFilters 'arm64-v8a'
+            }
+        }
+    }
+    buildTypes {
+        // The recompiled game is large; debug builds would be unusably slow.
+        debug {
+            externalNativeBuild { cmake { arguments "-DCMAKE_BUILD_TYPE=Release" } }
+            debuggable true
+            jniDebuggable false
+        }
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.debug
+        }
+    }
+    externalNativeBuild {
+        cmake {
+            path 'jni/CMakeLists.txt'
+            version '3.22.1'
+        }
+    }
+    packagingOptions {
+        jniLibs { useLegacyPackaging true }
+    }
+    lint { abortOnError false }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+}
