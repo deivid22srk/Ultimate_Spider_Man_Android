@@ -369,6 +369,15 @@ SHIM(GetCursorPos) {
         user32_cursor_get(&x, &y);
         M32(ARG(0)) = (uint32_t)x;
         M32(ARG(0) + 4) = (uint32_t)y;
+        {   /* diagnostic: the menus hit-test their widgets against this value
+             * (cursor * 640 / client width), so one line per change shows both
+             * whether the UI polls the cursor at all and where it lands */
+            static int lx, ly, n;
+            if ((x != lx || y != ly) && n++ < 300) {
+                lx = x; ly = y;
+                LOG("cursor: game read %d,%d", x, y);
+            }
+        }
     }
     RET(1, 1);
 }

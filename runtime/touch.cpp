@@ -51,6 +51,9 @@ float g_aspect = 16.f / 9.f;  // width / height of the screen
 // on-screen cursor, and when the camera zone was last dragged, for its hint.
 float g_ptr_x = 0.5f, g_ptr_y = 0.5f;
 uint32_t g_ptr_ms, g_look_ms;
+/* last touch of any kind, and the overlay opacity it drives (see touch_draw) */
+uint32_t g_touch_ms;
+float g_hud_mul = 1.f;
 
 // The game's VSync option byte, which the menu toggles and the settings save.
 const uint32_t G_VSYNC_OPTION = 0x9D0F3C;
@@ -170,6 +173,7 @@ extern "C" void touch_handle_event(const SDL_Event *e) {
         return;
     }
     g_seen = true;
+    g_touch_ms = SDL_GetTicks();
     Finger *f = nullptr;
     for (auto &g : g_fingers) if (g.used && g.id == id) f = &g;
     if (down && !f) {
@@ -362,6 +366,14 @@ void cursor_quad(Vtx *v, const ArtEntry *a, float cx, float cy, float r, float w
     float off = r * (112.f / 128.f); /* tip -> centre, in the same units as r */
     art_quad(v, a, cx + off / g_aspect, cy + off, r, w, h, color);
 }
+
+// The overlay is dimmed to g_hud_mul while nothing has been touched, so that it
+// stops sitting on top of the game's own menus (which are tapped *through* the
+// virtual cursor, so the art would otherwise hide them).
+uint32_t dim(uint32_t color) {
+    uint32_t a = (color >> 24) & 0xFF;
+    return (color & 0x00FFFFFFu) | ((uint32_t)(a * g_hud_mul) << 24);
+}
 } // namespace
 
 void touch_draw(IDirect3DDevice9 *d) {
@@ -371,7 +383,33 @@ void touch_draw(IDirect3DDevice9 *d) {
     D3DSURFACE_DESC desc;
     bb->GetDesc(&desc);
     float w = (float)desc.Width, h = (float)desc.Height;
-    g_aspect = w / h;
+    /* The quads are in back-buffer pixels but the aspect correction has to use
+     * the size the frame is *presented* at: dxvk scales a smaller back buffer
+     * up to the window, and boxing the layout in the back buffer's own aspect
+     * made every button an ellipse (the same mistake dxvk's blit makes to the
+     * game's frame, see pp_fix_size in d3d9_bridge.cpp). */
+    {
+        int pw = 0, ph = 0;
+        platform_window_size(&pw, &ph);
+        g_aspect = (pw > 0 && ph > 0) ? (float)pw / (float)ph : w / h;
+    }
+    if (!(g_aspect > 0.1f)) g_aspect = 16.f / 9.f;
+    {
+        static uint32_t lw, lh;
+        if (lw != desc.Width || lh != desc.Height) {
+            int pw = 0, ph = 0;
+            lw = desc.Width; lh = desc.Height;
+            platform_window_size(&pw, &ph);
+            LOG("touch: back buffer %ux%u, window %dx%d, aspect %.4f", desc.Width, desc.Height, pw, ph, (double)g_aspect);
+        }
+    }
+    {   /* Opacity: full for 2.5 s after the last touch, then down to 30% over
+         * half a second; any touch brings it straight back. */
+        uint32_t idle = SDL_GetTicks() - g_touch_ms;
+        g_hud_mul = idle < 2500 ? 1.f
+                  : idle < 3000 ? 1.f - 0.7f * (idle - 2500) / 500.f
+                  : 0.3f;
+    }
     if (!g_tex) make_texture(d);
     if (!g_state) d->CreateStateBlock(D3DSBT_ALL, &g_state);
     if (!g_tex || !g_state) { bb->Release(); return; }
@@ -424,11 +462,11 @@ void touch_draw(IDirect3DDevice9 *d) {
     float sx, sy;
     stick_pos(&sx, &sy);
     const ArtEntry *a;
-    if ((a = art("stick"))) art_quad(va + 6 * na++, a, sx, sy, STICK_R * 1.05f, w, h, 0xFFFFFFFF);
-    else quad(vd + 6 * nd++, sx, sy, STICK_R, w, h, 0x90FFFFFF);
+    if ((a = art("stick"))) art_quad(va + 6 * na++, a, sx, sy, STICK_R * 1.05f, w, h, dim(0xFFFFFFFF));
+    else quad(vd + 6 * nd++, sx, sy, STICK_R, w, h, dim(0x90FFFFFF));
     float kx = sx + g_stick_x * STICK_R / g_aspect, ky = sy + g_stick_y * STICK_R;
-    if ((a = art("knob"))) art_quad(va + 6 * na++, a, kx, ky, STICK_R * 0.47f, w, h, 0xFFFFFFFF);
-    else quad(vd + 6 * nd++, kx, ky, STICK_R * 0.45f, w, h, 0xD0FFFFFF);
+    if ((a = art("knob"))) art_quad(va + 6 * na++, a, kx, ky, STICK_R * 0.47f, w, h, dim(0xFFFFFFFF));
+    else quad(vd + 6 * nd++, kx, ky, STICK_R * 0.45f, w, h, dim(0xD0FFFFFF));
     for (int i = 0; i < NB; i++) {
         float bx, by;
         button_pos(k_buttons[i], &bx, &by);
@@ -436,8 +474,8 @@ void touch_draw(IDirect3DDevice9 *d) {
         char key[32];
         snprintf(key, sizeof key, "on/%s", k_button_icon[i]);
         const ArtEntry *b = art(on ? key : k_button_icon[i]);
-        if (b) art_quad(va + 6 * na++, b, bx, by, k_buttons[i].r * 1.06f, w, h, on ? 0xFFFFFFFF : 0xE0FFFFFF);
-        else quad(vd + 6 * nd++, bx, by, k_buttons[i].r, w, h, (k_buttons[i].color & 0xFFFFFF) | (on ? 0xF0u : 0x90u) << 24);
+        if (b) art_quad(va + 6 * na++, b, bx, by, k_buttons[i].r * 1.06f, w, h, dim(on ? 0xFFFFFFFF : 0xE0FFFFFF));
+        else quad(vd + 6 * nd++, bx, by, k_buttons[i].r, w, h, dim((k_buttons[i].color & 0xFFFFFF) | (on ? 0xF0u : 0x90u) << 24));
     }
 #ifdef GAME_USM
     /* Camera zone hint: only while the finger is dragging there, so nothing
@@ -445,17 +483,17 @@ void touch_draw(IDirect3DDevice9 *d) {
     uint32_t lookage = SDL_GetTicks() - g_look_ms;
     if ((a = art("campad")) && g_look_ms && lookage < 900)
         art_quad(va + 6 * na++, a, CAMPAD_X, CAMPAD_Y, CAMPAD_R, w, h,
-                 (uint32_t)((900 - lookage) * 0xB0 / 900) << 24 | 0xFFFFFF);
+                 dim((uint32_t)((900 - lookage) * 0xB0 / 900) << 24 | 0xFFFFFF));
     /* Where the finger last landed: the menus are clicked through the virtual
      * system cursor, so this is where that cursor now is (the game's own
      * pointer, when it draws one, sits at the same spot). */
     uint32_t age = SDL_GetTicks() - g_ptr_ms;
     if (g_ptr_ms && age < 1500) {
         uint32_t al = (uint32_t)((1500 - age) * 0xFF / 1500);
-        if ((a = art("cursor"))) cursor_quad(va + 6 * na++, a, g_ptr_x, g_ptr_y, 0.055f, w, h, al << 24 | 0xFFFFFF);
+        if ((a = art("cursor"))) cursor_quad(va + 6 * na++, a, g_ptr_x, g_ptr_y, 0.055f, w, h, dim(al << 24 | 0xFFFFFF));
         else {
-            quad(vd + 6 * nd++, g_ptr_x, g_ptr_y, 0.032f, w, h, 0xFFFFFF | (al * 0xC0 / 0xFF) << 24);
-            quad(vd + 6 * nd++, g_ptr_x, g_ptr_y, 0.013f, w, h, 0xFFFFFF | (al * 0xC0 / 0xFF) << 24);
+            quad(vd + 6 * nd++, g_ptr_x, g_ptr_y, 0.032f, w, h, dim(0xFFFFFF | (al * 0xC0 / 0xFF) << 24));
+            quad(vd + 6 * nd++, g_ptr_x, g_ptr_y, 0.013f, w, h, dim(0xFFFFFF | (al * 0xC0 / 0xFF) << 24));
         }
     }
 #endif

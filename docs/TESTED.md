@@ -45,6 +45,9 @@ Actions (NDK 27.2.12479018, clang 18).
 | Touch marker drawn at the last touch point (fades after 700 ms) | needs a screenshot |
 | the icon HUD's *appearance* (size, alpha, icon choice per button, pressed state, the camera-zone hint, the cursor art) | the loading is confirmed on the phone, but only the player can say whether it looks right; nothing here was seen by the agent |
 | Taps in menus selecting a widget | the tap is logged (`touch: tap x,y -> cursor X,Y (screen WxH)`) but no run has been checked for a menu response yet |
+| Back buffer forced to the window's aspect (`pp_fix_size`, `CreateDevice`/`Reset`) | fixes the measured 1.587x stretch (§11d of `docs/RECON.md`); the phone run that would confirm a crisp frame is still pending |
+| Overlay laid out from the *presented* size and faded to 30 % after 2.5 s idle | needs a screenshot; the geometry is the same maths the offline overlay replica (`/tmp/opencode/render_layout.py`) already matches |
+| Click-path diagnostics: `cursor: game read X,Y`, `dinput: mouse buttons NN`, `touch: back buffer WxH, window WxH, aspect A` | logged from the shims; which one of them shows a tap reaching the game is exactly what the next run has to answer |
 | "Contextual" part of the HUD (show/hide and swap icons by game state) | not implemented: none of the game-state signals (level pointer, Bink playback, ShowCursor count) is wired yet |
 | Android launcher (folder validation, SHA-1 check, options) | only exercised by hand so far |
 | `runtime/usm_shims.c` CRT/dialog/image-list shims beyond the exercised paths | compiles, but not every shim has been hit by real game code |

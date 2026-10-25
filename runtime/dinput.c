@@ -124,8 +124,16 @@ SHIM(dev_GetDeviceState) {
         /* Buttons: the host mouse, plus the ones the touch layer holds down to
          * click the game's UI (which reads the system cursor, see user32.c). */
         uint32_t vb = user32_mouse_buttons();
-        for (int i = 0; i < 3 && 12 + (uint32_t)i < n; i++)
+        uint32_t down = 0;
+        for (int i = 0; i < 3 && 12 + (uint32_t)i < n; i++) {
             M8(p + 12 + i) = ((b & SDL_BUTTON(i + 1)) || (vb & (1u << i))) ? 0x80 : 0;
+            down |= (M8(p + 12 + i) ? 1u : 0u) << i;
+        }
+        {   /* diagnostic: the buttons the game actually reads back -- the menus
+             * click through this device, so this shows whether a tap arrives */
+            static uint32_t last;
+            if (down != last) { last = down; LOG("dinput: mouse buttons %02x", down); }
+        }
     }
     RET(0, 3);
 }

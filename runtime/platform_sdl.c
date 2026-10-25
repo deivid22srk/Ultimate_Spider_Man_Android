@@ -226,6 +226,18 @@ void platform_pump_events(void) {
 void platform_present_hook(void) {
     poll_key_fifo();
     platform_pump_events();
+    {   /* The window only gets its real size once it is fullscreen, and the
+         * game's client space -- GetClientRect, and the cursor the UI divides
+         * by it -- must follow it (user32.c owns that space). */
+        static int lw, lh;
+        int ww = 0, wh = 0;
+        if (g_window) SDL_GetWindowSize(g_window, &ww, &wh);
+        if (ww > 0 && wh > 0 && (ww != lw || wh != lh)) {
+            lw = ww; lh = wh;
+            user32_set_screen(ww, wh);
+            LOG("platform: client %dx%d", ww, wh);
+        }
+    }
     script_events();
     g_frames++;
 #ifdef GAME_SKYRIM

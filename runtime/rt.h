@@ -97,5 +97,13 @@ uint32_t user32_mouse_buttons(void);
 void user32_pointer_fingers(int n);
 void user32_clip_cursor(uint32_t rect);
 int user32_cursor_clipped(void);
+/* GetClientRect/GetWindowRect/GetCursorPos space: the client area, which the
+ * present path and platform_sdl.c keep in step with the window (d3d9_bridge.cpp
+ * and platform_sdl.c both set it, so the game's widget hit-test divides the
+ * cursor by exactly the space it is in). */
+void user32_set_screen(int w, int h);
+
+/* ---- platform (runtime/platform_sdl.c) ---- */
+void platform_window_size(int *w, int *h);
 
 void rt_init_shims(void);

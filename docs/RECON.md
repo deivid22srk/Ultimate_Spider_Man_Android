@@ -363,6 +363,52 @@ is **not** implemented — none of the signals it needs (the front-end level
 pointer, Bink playback, a meaningful `ClipCursor`/`ShowCursor` change) is
 wired up yet.
 
+## 11d. The present path stretched the whole frame (measured, fixed)
+
+The first runs on the phone showed the HUD stretched and pushed to one side,
+and the game's own menu text in the same state: wide, squat glyphs. That is
+not an overlay bug — the frame itself is stretched.
+
+`USM.exe` keeps its own resolution in `pcconfig.txt` and on a fresh install
+that is its 4:3 default, so it called `CreateDevice` with
+`BackBufferWidth/Height = 800x600`. DXVK sizes its D3D9 back buffer from those
+present parameters (`D3D9SwapChainEx::CreateBackBuffers`) but builds the
+presenter images at `wsi::getWindowSize()` — the SDL window, 2285x1080 here —
+and `UpdatePresentRegion` then blits `m_srcRect = (0,0,800,600)` onto
+`m_dstRect = (0,0,2285,1080)`. Non-uniform scale, and the swap chain
+composited at an x offset of 115 px (the 2400-px display is wider than the
+2285-px surface).
+
+Measured on `Screenshot_20261025-190014.png` by fitting seven known overlay
+elements (`runtime/touch.cpp` puts them at fixed normalised positions):
+
+    x_screen = 2.857 * x_800 + 114.5        y_screen = 1.801 * y_600
+    2.857 = 2285/800, 1.801 = 1080/600, 114.5 = the compositor's x offset
+
+Two consequences, both visible on the device:
+
+* the game is drawn 1.587x too wide (the menu glyphs confirm it), and
+* `touch_draw` reads its aspect from `GetBackBuffer()->GetDesc()`, i.e. 4:3,
+  so every overlay quad was laid out 1.587x too wide and every button an
+  ellipse instead of a disc.
+
+Fix, in `runtime/d3d9_bridge.cpp`: `pp_fix_size` replaces a requested size
+whose aspect is not the window's with the window's own size — entry 0 of the
+list `EnumAdapterModes` already offers the game's "Resolution Scale" menu — so
+the blit is 1:1. A size the player picks from that menu (or a scaled mode like
+1142x540) is already at the window's aspect and is left alone. It also parks
+`user32_set_screen` on the same window size, because that is the space
+`GetClientRect` reports and the space the menus divide the cursor by (§11b);
+`platform_present_hook` keeps it in step, since the window only gets its real
+size once it is fullscreen.
+
+`touch_draw` no longer trusts the back buffer for its aspect: it lays the
+overlay out in back-buffer pixels but corrects the aspect with the size the
+frame is *presented* at, so a smaller back buffer can never distort the
+overlay again. It also fades the overlay to 30 % after 2.5 s without a touch
+(back to full on any touch), so it stops covering the game's own menus, which
+are tapped through the virtual cursor — a stopgap until the contextual HUD.
+
 ## 12. Risk plan
 
 | Risk | Likelihood | Mitigation |

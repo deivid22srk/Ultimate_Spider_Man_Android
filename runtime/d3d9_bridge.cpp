@@ -244,6 +244,33 @@ extern "C" void bridge_scaled_mode(uint32_t i, uint32_t *w, uint32_t *h) {
         if (++k == i) { *h = mh; *w = (uint32_t)((uint64_t)mh * ww / wh) & ~1u; return; }
     }
 }
+
+/* The game keeps its own resolution in pcconfig.txt, and on a first run that
+ * is its 4:3 default (800x600) while the phone's window is 19.5:9: dxvk blits
+ * the back buffer across the whole window, so the frame -- the game's UI *and*
+ * the touch overlay, which is laid out from the back buffer's own aspect --
+ * came out stretched ~1.6x horizontally. Replace any size that is not at the
+ * window's aspect with the window's own size, the first entry of the list the
+ * game's "Resolution Scale" menu offers, so the blit is 1:1. An in-game
+ * Resolution Scale choice is already at the window's aspect and is kept. */
+static void pp_fix_size(D3DPRESENT_PARAMETERS *pp) {
+    int ww = 0, wh = 0;
+    platform_window_size(&ww, &wh);
+    if (ww <= 0 || wh <= 0) return;
+    /* GetClientRect / GetCursorPos / the touch cursor all live in this space,
+     * and the game's widget hit-test divides the cursor by it. */
+    user32_set_screen(ww, wh);
+    uint32_t bw = pp->BackBufferWidth, bh = pp->BackBufferHeight;
+    if (!bw || !bh) return;
+    long long off = (long long)bw * wh - (long long)bh * ww; /* aspect error, in windows */
+    if (off < 0) off = -off;
+    if (off <= (long long)wh) return;                        /* already the window's aspect */
+    LOG("back buffer %ux%u is not the window's aspect: using %ux%u (mode 0) so dxvk does not stretch the frame",
+        bw, bh, (unsigned)ww, (unsigned)wh);
+    pp->BackBufferWidth = (uint32_t)ww;
+    pp->BackBufferHeight = (uint32_t)wh;
+}
+
 void B_IDirect3D9_GetAdapterModeCount(CPU *c) { int ww, wh; RET(mode_count(&ww, &wh), 3); }
 void B_IDirect3D9_EnumAdapterModes(CPU *c) {
     /* (this, adapter, format, mode, D3DDISPLAYMODE *) */
@@ -290,6 +317,7 @@ void B_IDirect3D9_CreateDevice(CPU *c) {
     LOG("CreateDevice %ux%u fmt=%d ds=%d/%d windowed(guest)=%u flags=%x interval=%x",
         pp.BackBufferWidth, pp.BackBufferHeight, pp.BackBufferFormat, pp.EnableAutoDepthStencil,
         pp.AutoDepthStencilFormat, M32(ARG(5) + 32), ARG(4), pp.PresentationInterval);
+    pp_fix_size(&pp);
     IDirect3DDevice9 *dev = nullptr;
     DWORD flags = ARG(4) | D3DCREATE_MULTITHREADED;
     rt_host_affinity_begin();
@@ -329,6 +357,7 @@ void B_IDirect3DDevice9_Reset(CPU *c) {
     auto *d = (IDirect3DDevice9 *)com_host(ARG(0));
     D3DPRESENT_PARAMETERS pp;
     pp_from_guest(ARG(1), &pp);
+    pp_fix_size(&pp);
     rt_host_affinity_begin();
     HRESULT hr = d->Reset(&pp);
     rt_host_affinity_end();
