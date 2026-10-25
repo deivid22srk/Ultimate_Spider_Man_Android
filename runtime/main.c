@@ -264,6 +264,9 @@ static void on_crash(int sig, siginfo_t *si, void *ucv) {
     extern void rt_dump_guest(void);
     rt_dump_guest();
     { extern void rt_wd_dump(void); rt_wd_dump(); }
+#if defined(GAME_USM)
+    { extern void usm_dump_state(void); usm_dump_state(); }
+#endif
     fprintf(stderr, "backtrace:\n");
     print_pc(-1, pc);
     print_pc(-2, lr);

@@ -972,3 +972,37 @@ void usm_shims_init(void) {
     LOG("usm_shims: %d USM-specific imports registered (msvcr71/msvcp71, win32 gaps)",
         (int)(sizeof defs / sizeof defs[0] - 1));
 }
+
+/* Diagnostic for the entity-name hash_map crash (guest 0x509440 reads a node
+ * pointer out of the bucket array). Prints the map and the entity name the
+ * game was registering when it faulted. */
+void usm_dump_state(void) {
+    uint32_t map = 0x95B79C;
+    fprintf(stderr, "usm: hash_map@95B79C:");
+    for (int i = 0; i < 0x28; i += 4) fprintf(stderr, " %08x", M32(map + i));
+    fprintf(stderr, "\nusm: 95B7A4=%08x 95B8C0=%08x 9682E4=%02x\n",
+            M32(0x95B7A4), M32(0x95B8C0), M8(0x9682E4));
+    uint32_t buckets = M32(map + 0x14);
+    if (buckets >= 0x1000 && buckets < 0x40000000u) {
+        fprintf(stderr, "usm: buckets@%08x:", buckets);
+        for (int i = 0; i < 16; i++) fprintf(stderr, " %08x", M32(buckets + 4 * i));
+        fprintf(stderr, "\n");
+    }
+    CPU *c = rt_current_cpu();
+    if (!c) return;
+    uint32_t str = c->r[6];  /* esi at the call: entity + 0x10 (the name) */
+    uint32_t ent = c->r[1] == map ? str - 0x10 : 0;
+    fprintf(stderr, "usm: entity %08x name@%08x: %08x %08x %08x %08x\n", ent, str,
+            M32(str), M32(str + 4), M32(str + 8), M32(str + 12));
+    uint32_t p = M32(str);
+    if (p >= 0x1000 && p < 0x40000000u) {
+        char buf[64]; int i = 0;
+        for (; i < 63 && M8(p + i); i++) buf[i] = (char)M8(p + i);
+        buf[i] = 0;
+        fprintf(stderr, "usm: name='%s' (%d bytes)\n", buf, i);
+    }
+    uint32_t esp = c->r[4];
+    fprintf(stderr, "usm: stack@%08x:", esp);
+    for (int i = 0; i < 12; i++) fprintf(stderr, " %08x", M32(esp + 4 * i));
+    fprintf(stderr, "\n");
+}

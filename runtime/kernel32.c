@@ -941,6 +941,8 @@ SHIM(CreateDirectoryA) {
 static int find_next(GFind *g, uint32_t out) {
     struct dirent *de;
     while ((de = readdir(g->d))) {
+        /* Windows never returns the dot entries. */
+        if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, "..")) continue;
         if (fnmatch(g->pat, de->d_name, FNM_CASEFOLD)) continue;
         char full[1400];
         struct stat st;

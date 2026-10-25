@@ -205,8 +205,10 @@ SHIM(_unlock) { RETC(0); }
 SHIM(_amsg_exit) { rt_fatal("msvcrt _amsg_exit(%u)", ARG(0)); }
 SHIM(_initterm) {
     uint32_t b = ARG(0), e = ARG(1);
+    int n = 0;
     for (uint32_t p = b; p < e; p += 4)
-        if (M32(p)) rt_invoke(c, M32(p), 0, NULL);
+        if (M32(p)) { rt_invoke(c, M32(p), 0, NULL); n++; }
+    LOG("_initterm %08x..%08x: %d initializers", b, e, n);
     RETC(0);
 }
 SHIM(_XcptFilter) { RETC(0); }
