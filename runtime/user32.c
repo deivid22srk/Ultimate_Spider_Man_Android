@@ -31,6 +31,7 @@ void user32_set_screen(int w, int h) { g_screen_w = w; g_screen_h = h; }
 #define BTN_LATCH_MS 120
 static int g_cursor_x, g_cursor_y, g_cursor_init;
 static uint32_t g_mouse_btn, g_btn_latch[4];
+static int g_pointer_fingers; /* fingers currently touching as a pointer */
 static int g_clip_x0, g_clip_y0, g_clip_x1 = -1, g_clip_y1 = -1;
 
 void user32_screen(int *w, int *h) { *w = g_screen_w; *h = g_screen_h; }
@@ -73,11 +74,28 @@ void user32_mouse_button(int btn, int down) {
     }
 }
 
+/* How many fingers are currently acting as the pointer. Button 0 stays down
+ * while that is > 0 (so press-and-drag on a menu works) and is released
+ * BTN_LATCH_MS after the last one lifts, so a tap shorter than a frame is
+ * still seen by the game. */
+void user32_pointer_fingers(int n) {
+    g_pointer_fingers = n < 0 ? 0 : n;
+    if (g_pointer_fingers > 0) {
+        g_mouse_btn |= 1u;
+        g_btn_latch[0] = SDL_GetTicks() + BTN_LATCH_MS;
+    }
+}
+
 uint32_t user32_mouse_buttons(void) {
     uint32_t t = SDL_GetTicks();
-    for (int i = 0; i < 4; i++)
-        if ((g_mouse_btn & (1u << i)) && (int32_t)(g_btn_latch[i] - t) <= 0)
-            g_mouse_btn &= ~(1u << i);
+    for (int i = 0; i < 4; i++) {
+        if (!(g_mouse_btn & (1u << i))) continue;
+        if (i == 0 && g_pointer_fingers > 0) { /* still held: keep the latch fresh */
+            g_btn_latch[i] = t + BTN_LATCH_MS;
+            continue;
+        }
+        if ((int32_t)(g_btn_latch[i] - t) <= 0) g_mouse_btn &= ~(1u << i);
+    }
     return g_mouse_btn;
 }
 

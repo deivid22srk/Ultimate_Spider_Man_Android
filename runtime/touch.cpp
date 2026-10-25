@@ -41,9 +41,8 @@ bool g_available, g_decided, g_seen, g_was_on;
 bool g_touch_on = true;       // the player's choice, kept in <save>/touch.cfg
 uint16_t g_buttons;
 float g_aspect = 16.f / 9.f;  // width / height of the screen
-// Touch pointer (GAME_USM): fingers holding the virtual left button, and where
-// the last one landed, for the on-screen marker.
-int g_pointers;
+// Touch pointer (GAME_USM): where the last pointer finger landed, for the
+// on-screen marker.
 float g_ptr_x = 0.5f, g_ptr_y = 0.5f;
 uint32_t g_ptr_ms;
 
@@ -82,6 +81,9 @@ bool enabled() {
         g_stick_x = g_stick_y = 0;
         g_buttons = 0;
         input_set_virtual(0, 0, 0, 0, 0, 0, 0);
+#ifdef GAME_USM
+        { extern void user32_pointer_fingers(int); user32_pointer_fingers(0); } // let go of the left button
+#endif
     }
     g_was_on = on;
     return on;
@@ -192,6 +194,7 @@ extern "C" void touch_handle_event(const SDL_Event *e) {
     extern void user32_screen(int *, int *);
     extern void user32_cursor_set(int, int);
     extern void user32_mouse_button(int, int);
+    extern void user32_pointer_fingers(int);
     if (f->ptr && down) {
         int w = 1280, h = 720;
         user32_screen(&w, &h);
@@ -199,9 +202,8 @@ extern "C" void touch_handle_event(const SDL_Event *e) {
         g_ptr_x = x;
         g_ptr_y = y;
         g_ptr_ms = SDL_GetTicks();
-        if (!g_pointers++) user32_mouse_button(0, 1);
+        user32_mouse_button(0, 1);
     }
-    if (f->ptr && up && g_pointers > 0 && --g_pointers == 0) user32_mouse_button(0, 0);
     if (!down && !up && f->look) {
         int w = 0, h = 0;
         extern void platform_window_size(int *, int *);
@@ -216,6 +218,14 @@ extern "C" void touch_handle_event(const SDL_Event *e) {
     f->x = x;
     f->y = y;
     if (up) f->used = false;
+#ifdef GAME_USM
+    {   /* the button follows the fingers that are actually down (see user32.c) */
+        int n = 0;
+        for (auto &g : g_fingers)
+            if (g.used && g.ptr) n++;
+        user32_pointer_fingers(n);
+    }
+#endif
     update();
 }
 
