@@ -16,6 +16,93 @@ static void post_msg(uint32_t msg, uint32_t wp, uint32_t lp);
 uint32_t user32_wndproc(void) { return g_wndproc; }
 void user32_set_screen(int w, int h) { g_screen_w = w; g_screen_h = h; }
 
+/* ---- virtual cursor and mouse buttons -----------------------------------
+ * The PC ports read the mouse through two different paths: DirectInput's
+ * mouse device (relative motion + buttons) for the camera, and the *system
+ * cursor* (GetCursorPos) for every piece of UI -- the menus hit-test widgets
+ * against it (USM does exactly that, see docs/RECON.md). Android has no system
+ * cursor, so the touch layer owns this one: a tap warps it and holds the left
+ * button, which no game binds to an in-game action.
+ *
+ * The buttons have to survive being polled: a game only sees a click when
+ * GetDeviceState / the game's own frame happens to run while it is down, so a
+ * quick tap would be missed. A press therefore stays down for at least
+ * BTN_LATCH_MS. */
+#define BTN_LATCH_MS 120
+static int g_cursor_x, g_cursor_y, g_cursor_init;
+static uint32_t g_mouse_btn, g_btn_latch[4];
+static int g_clip_x0, g_clip_y0, g_clip_x1 = -1, g_clip_y1 = -1;
+
+void user32_screen(int *w, int *h) { *w = g_screen_w; *h = g_screen_h; }
+
+static void clamp_cursor(int *x, int *y) {
+    int x0 = 0, y0 = 0, x1 = g_screen_w - 1, y1 = g_screen_h - 1;
+    if (g_clip_x1 > g_clip_x0) { x0 = g_clip_x0; x1 = g_clip_x1; }
+    if (g_clip_y1 > g_clip_y0) { y0 = g_clip_y0; y1 = g_clip_y1; }
+    if (*x < x0) *x = x0;
+    if (*x > x1) *x = x1;
+    if (*y < y0) *y = y0;
+    if (*y > y1) *y = y1;
+}
+
+void user32_cursor_set(int x, int y) {
+    g_cursor_init = 1;
+    clamp_cursor(&x, &y);
+    g_cursor_x = x;
+    g_cursor_y = y;
+}
+
+void user32_cursor_add(int dx, int dy) {
+    if (!g_cursor_init) user32_cursor_set(g_screen_w / 2, g_screen_h / 2);
+    user32_cursor_set(g_cursor_x + dx, g_cursor_y + dy);
+}
+
+void user32_cursor_get(int *x, int *y) {
+    if (!g_cursor_init) user32_cursor_set(g_screen_w / 2, g_screen_h / 2);
+    *x = g_cursor_x;
+    *y = g_cursor_y;
+}
+
+void user32_mouse_button(int btn, int down) {
+    if (btn < 0 || btn > 3) return;
+    if (down) {
+        g_mouse_btn |= 1u << btn;
+        g_btn_latch[btn] = SDL_GetTicks() + BTN_LATCH_MS;
+    } else if ((int32_t)(g_btn_latch[btn] - SDL_GetTicks()) <= 0) {
+        g_mouse_btn &= ~(1u << btn);
+    }
+}
+
+uint32_t user32_mouse_buttons(void) {
+    uint32_t t = SDL_GetTicks();
+    for (int i = 0; i < 4; i++)
+        if ((g_mouse_btn & (1u << i)) && (int32_t)(g_btn_latch[i] - t) <= 0)
+            g_mouse_btn &= ~(1u << i);
+    return g_mouse_btn;
+}
+
+/* ClipCursor: USM only ever passes NULL (it never confines the cursor), but a
+ * bounded rect is the classic "the game grabbed the mouse for mouse look"
+ * signal, so keep it for the HUD and clamp the virtual cursor to it. */
+void user32_clip_cursor(uint32_t rect) {
+    int x0 = 0, y0 = 0, x1 = -1, y1 = -1;
+    if (rect) {
+        x0 = (int)M32(rect);
+        y0 = (int)M32(rect + 4);
+        x1 = (int)M32(rect + 8);
+        y1 = (int)M32(rect + 12);
+    }
+    if (x0 == g_clip_x0 && y0 == g_clip_y0 && x1 == g_clip_x1 && y1 == g_clip_y1) return;
+    g_clip_x0 = x0;
+    g_clip_y0 = y0;
+    g_clip_x1 = x1;
+    g_clip_y1 = y1;
+    if (rect) LOG("cursor clipped to %d,%d-%d,%d", x0, y0, x1, y1);
+    else LOG("cursor clip released");
+}
+
+int user32_cursor_clipped(void) { return g_clip_x1 > g_clip_x0; }
+
 /* Windows activates a shown top-level window: WM_ACTIVATEAPP(TRUE) is what
  * tells the guest it may start rendering (USM idles in PeekMessageA until
  * its wndproc sees it). Posted, not sent, so it arrives on the game's pump. */
@@ -62,7 +149,7 @@ SHIM(SystemParametersInfoA) { RET(1, 4); }
 SHIM(LoadIconA) { RET(0x20001, 2); }
 SHIM(LoadCursorA) { RET(0x20002, 2); }
 SHIM(SetCursor) { RET(0, 1); }
-SHIM(SetCursorPos) { RET(1, 2); }
+SHIM(SetCursorPos) { user32_cursor_set((int)ARG(0), (int)ARG(1)); RET(1, 2); }
 /* real display counter: games loop "while (ShowCursor(FALSE) >= 0)" */
 static volatile int g_cursor_count = 0;
 SHIM(ShowCursor) { int n = ARG(0) ? __atomic_add_fetch(&g_cursor_count, 1, __ATOMIC_SEQ_CST) : __atomic_sub_fetch(&g_cursor_count, 1, __ATOMIC_SEQ_CST); RET((uint32_t)n, 1); }
@@ -117,9 +204,17 @@ static void post_msg(uint32_t msg, uint32_t wp, uint32_t lp) {
 }
 
 /* Live virtual-key state, so GetKeyboardState/GetAsyncKeyState agree with
- * the key messages (the .fdf parser and the options screen poll them). */
+ * the key messages (the .fdf parser and the options screen poll them). Mouse
+ * buttons have virtual-key codes too, mirrored here so GetKeyState(VK_LBUTTON)
+ * answers the same as the DInput mouse device the touch layer clicks with. */
 static uint8_t g_vk_state[256];
-const uint8_t *user32_vk_states(void) { return g_vk_state; }
+const uint8_t *user32_vk_states(void) {
+    uint32_t b = user32_mouse_buttons();
+    g_vk_state[0x01] = (b & 1) ? 0x80 : 0; /* VK_LBUTTON */
+    g_vk_state[0x02] = (b & 2) ? 0x80 : 0; /* VK_RBUTTON */
+    g_vk_state[0x04] = (b & 4) ? 0x80 : 0; /* VK_MBUTTON */
+    return g_vk_state;
+}
 
 /* vk: Windows virtual-key code; sc: PC set-1 scan code */
 void user32_key_event(uint32_t vk, uint32_t sc, int down) {
@@ -250,7 +345,15 @@ SHIM(CreateCompatibleBitmap) { RET(0x30003, 3); }
 SHIM(GetWindowThreadProcessId) { if (ARG(1)) M32(ARG(1)) = 0x42; RET(1, 2); }
 SHIM(ClientToScreen) { RET(1, 2); }
 SHIM(ScreenToClient) { RET(1, 2); }
-SHIM(GetCursorPos) { M32(ARG(0)) = 0; M32(ARG(0) + 4) = 0; RET(1, 1); }
+SHIM(GetCursorPos) {
+    if (ARG(0)) {
+        int x, y;
+        user32_cursor_get(&x, &y);
+        M32(ARG(0)) = (uint32_t)x;
+        M32(ARG(0) + 4) = (uint32_t)y;
+    }
+    RET(1, 1);
+}
 static void put_rect(uint32_t p) { M32(p) = 0; M32(p + 4) = 0; M32(p + 8) = (uint32_t)g_screen_w; M32(p + 12) = (uint32_t)g_screen_h; }
 SHIM(GetWindowRect) { put_rect(ARG(1)); RET(1, 2); }
 SHIM(GetClientRect) { put_rect(ARG(1)); RET(1, 2); }

@@ -165,9 +165,17 @@ void usm_input_update(void) {
     extern void platform_vk_set(uint32_t, int);
     extern void platform_mouse_add(int, int);
     extern void user32_key_event(uint32_t vk, uint32_t sc, int down);
+    extern int platform_frame_count(void);
     uint16_t b = g_virt.buttons;
     int16_t lx = g_virt.lx, ly = g_virt.ly, rx = g_virt.rx, ry = g_virt.ry;
     SDL_GameController *p = g_pads[0];
+    /* This runs from the event pump (throttled to one pump per millisecond),
+     * not per frame: the mouse deltas below accumulate, so only add them once
+     * per presented frame or the camera would spin ~60x too fast. */
+    static int last_frame = -1;
+    int frame = platform_frame_count();
+    int new_frame = frame != last_frame;
+    last_frame = frame;
     if (p) {
         static const struct { SDL_GameControllerButton b; uint16_t bit; } map[] = {
             {SDL_CONTROLLER_BUTTON_DPAD_UP, 0x1}, {SDL_CONTROLLER_BUTTON_DPAD_DOWN, 0x2},
@@ -186,7 +194,7 @@ void usm_input_update(void) {
         if (ay > 8000 || ay < -8000) ly = (int16_t)~ay; /* SDL: down is positive */
         int sx = SDL_GameControllerGetAxis(p, SDL_CONTROLLER_AXIS_RIGHTX);
         int sy = SDL_GameControllerGetAxis(p, SDL_CONTROLLER_AXIS_RIGHTY);
-        if (sx > 4000 || sx < -4000 || sy > 4000 || sy < -4000)
+        if (new_frame && (sx > 4000 || sx < -4000 || sy > 4000 || sy < -4000))
             platform_mouse_add(sx / 3000, sy / 3000);
     }
     if (b != g_usm_b) {

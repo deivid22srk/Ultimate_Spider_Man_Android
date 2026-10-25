@@ -34,13 +34,18 @@ const Button k_buttons[] = {
 const int NB = sizeof k_buttons / sizeof k_buttons[0];
 const float STICK_X = 0.24f, STICK_Y = -0.26f, STICK_R = 0.17f; // from bottom-left
 
-struct Finger { SDL_FingerID id; int button; bool stick; bool look; float x, y; bool used; };
+struct Finger { SDL_FingerID id; int button; bool stick; bool look; bool ptr; float x, y; bool used; };
 Finger g_fingers[10];
 float g_stick_x, g_stick_y;   // knob offset, -1..1
 bool g_available, g_decided, g_seen, g_was_on;
 bool g_touch_on = true;       // the player's choice, kept in <save>/touch.cfg
 uint16_t g_buttons;
 float g_aspect = 16.f / 9.f;  // width / height of the screen
+// Touch pointer (GAME_USM): fingers holding the virtual left button, and where
+// the last one landed, for the on-screen marker.
+int g_pointers;
+float g_ptr_x = 0.5f, g_ptr_y = 0.5f;
+uint32_t g_ptr_ms;
 
 // The game's VSync option byte, which the menu toggles and the settings save.
 const uint32_t G_VSYNC_OPTION = 0x9D0F3C;
@@ -165,6 +170,7 @@ extern "C" void touch_handle_event(const SDL_Event *e) {
         f->used = true;
         f->id = id;
         f->button = hit_button(x, y);
+        f->ptr = false;
         // anything on the left half that is not a button drives the stick
         f->stick = f->button < 0 && x < 0.5f;
 #ifdef GAME_USM
@@ -172,16 +178,39 @@ extern "C" void touch_handle_event(const SDL_Event *e) {
          * the right half drags the camera (the game reads the mouse). */
         f->stick = f->button < 0 && x < 0.45f;
         f->look = f->button < 0 && x >= 0.45f;
+        f->ptr = f->button < 0;
 #endif
     }
     if (!f) return;
 #ifdef GAME_USM
+    /* USM's menus hit-test widgets against the *system cursor* (GetCursorPos)
+     * and its window procedure ignores every mouse message, so a touch that is
+     * not on an overlay button warps the virtual cursor and holds the left
+     * button: the menus become tappable and the in-game prompts follow the
+     * finger. The left button is bound to nothing in game, so the same gesture
+     * is harmless there. */
+    extern void user32_screen(int *, int *);
+    extern void user32_cursor_set(int, int);
+    extern void user32_mouse_button(int, int);
+    if (f->ptr && down) {
+        int w = 1280, h = 720;
+        user32_screen(&w, &h);
+        user32_cursor_set((int)(x * w), (int)(y * h));
+        g_ptr_x = x;
+        g_ptr_y = y;
+        g_ptr_ms = SDL_GetTicks();
+        if (!g_pointers++) user32_mouse_button(0, 1);
+    }
+    if (f->ptr && up && g_pointers > 0 && --g_pointers == 0) user32_mouse_button(0, 0);
     if (!down && !up && f->look) {
         int w = 0, h = 0;
         extern void platform_window_size(int *, int *);
         extern void platform_mouse_add(int, int);
         platform_window_size(&w, &h);
         platform_mouse_add((int)((x - f->x) * w * 2.f), (int)((y - f->y) * h * 2.f));
+        g_ptr_x = x;
+        g_ptr_y = y;
+        g_ptr_ms = SDL_GetTicks();
     }
 #endif
     f->x = x;
@@ -277,7 +306,7 @@ void touch_draw(IDirect3DDevice9 *d) {
     d->SetSamplerState(0, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP);
     d->SetSamplerState(0, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP);
 
-    Vtx v[6 * (NB + 2)];
+    Vtx v[6 * (NB + 4)];
     int n = 0;
     float sx, sy;
     stick_pos(&sx, &sy);
@@ -291,6 +320,17 @@ void touch_draw(IDirect3DDevice9 *d) {
         uint32_t a = (g_buttons & k_buttons[i].bit) ? 0xF0 : 0x90;
         quad(v + 6 * n++, bx, by, k_buttons[i].r, w, h, (col & 0xFFFFFF) | a << 24);
     }
+#ifdef GAME_USM
+    /* Where the finger last landed: the menus are clicked through the virtual
+     * system cursor, so this tells the player where that cursor now is (the
+     * game's own pointer, when it draws one, sits at the same spot). */
+    uint32_t age = SDL_GetTicks() - g_ptr_ms;
+    if (g_ptr_ms && age < 700) {
+        uint32_t a = (uint32_t)((700 - age) * 0xC0 / 700);
+        quad(v + 6 * n++, g_ptr_x, g_ptr_y, 0.032f, w, h, 0xFFFFFF | a << 24);
+        quad(v + 6 * n++, g_ptr_x, g_ptr_y, 0.013f, w, h, 0xFFFFFF | a << 24);
+    }
+#endif
     d->DrawPrimitiveUP(D3DPT_TRIANGLELIST, 2 * n, v, sizeof(Vtx));
     d->EndScene();
     d->SetRenderTarget(0, old);

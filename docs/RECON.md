@@ -267,6 +267,67 @@ are logged by name at lift time and are the first candidates for
 17 MB translation unit) is clean; the only diagnostics are the lifter's
 `-Wparentheses-equality` idiom, silenced by `-w` in the build.
 
+## 11b. Input model (verified in the binary, `llvm-objdump` of the whole image)
+
+This is what the game actually does, not what the SDK usually implies. Every
+claim below comes from a call-site scan of `USM.exe` (`66c58c6e...`).
+
+| Fact | Evidence |
+|---|---|
+| No static DirectInput/XInput imports | the import table has neither `dinput8.dll` nor `xinput*.dll`; `winmm.dll` only brings the time functions |
+| DirectInput is loaded dynamically | `f_81F9A0`: `LoadLibraryA("dinput8.dll")` + `GetProcAddress(..., "DirectInput8Create")`, called from the input-manager constructor `f_5B0D00` (object 0x129E8 bytes, `IDirectInput8` at +0x2894, manager pointer `[0x987948]`) |
+| Keyboard and mouse come from DInput devices | the manager polls `IDirectInputDevice8::GetDeviceState`; our shim is reached there (`runtime/dinput.c`) |
+| The window procedure sees **no** mouse messages | `f_5941A0` handles only 2..0x100, 0x102..0x112, 0x1C, ...; `0x200`/`0x201` fall through to `DefWindowProcA` |
+| Keyboard-by-window-message is dead code | the `WM_KEYDOWN`/`WM_KEYUP` broadcast `f_5BCA60` is invoked only through the sink pointers `[0x9680A0]`/`[0x9680A4]`, and the two functions that would set them (`f_5BCA20`, `f_5BCA40`) are **never called** anywhere in the image |
+| The UI is driven by the **system cursor** | widget hit-test `f_589EF0`/`f_589FA0` calls `GetCursorPos` + `ScreenToClient` + `GetClientRect`; `f_581C60` maps the cursor into widget coordinates and is called by the widget classes; the game draws its own pointer (`f_594DF0`, texture `data\packs\mouse.dat`) |
+| `ClipCursor` is only ever called with `NULL` | all four call sites (wndproc `0x5942BB`, `f_5A4F40` `0x5A5005`, main loop `0x5AD533`, `0x5AD59C`) `pushl $0x0` first, so there is **no** "mouse captured for mouse-look" signal to read |
+| `SetCursorPos` is not used for mouse look | only three call sites, all in window/UI classes (`f_589DB0`, `f_589E50`, `f_8203F0`); the camera comes from the mouse device's relative axes |
+| A 256-byte table maps VK → the game's own "logical key" codes | `0x88CC68`, used by the wndproc (letters 1..26) — a different space from the DirectInput bindings |
+
+Action binding table: `0x88D648`, 18 entries of 0x48 bytes each
+(`name[0x20]`, `id`, `inverse`, then three 8-byte bindings encoded as
+`type << 16 | code`). The left mouse button appears in **no** binding:
+
+| # | Action | Keyboard | Alt | Pad / mouse |
+|---|---|---|---|---|
+| 01 | Forward | W | Up | Pad 4 |
+| 02 | Backward | S | Down | Pad 3 |
+| 03 | TurnLeft | A | Left | Pad 2 |
+| 04 | TurnRight | D | Right | Pad 1 |
+| 05 | CameraUp | Numpad 8 | PgUp | — |
+| 06 | CameraDown | Numpad 2 | PgDn | — |
+| 07 | CameraLeft | Numpad 4 | — | — |
+| 08 | CameraRight | Numpad 6 | — | — |
+| 09 | Jump | Space | — | Pad 21 |
+| 0A | StickToWalls | F | LShift | Pad 22 |
+| 0B | Punch | Q | LCtrl | Pad 23 |
+| 0C | Kick | E | LAlt | Pad 24 |
+| 0D | ThrowWeb | C | — | Mouse 10 |
+| 0E | BlackButton | V | — | Mouse 9 |
+| 0F | Pause | Esc | — | — |
+| 10 | BackButton | M | — | — |
+| 11 | CameraCenter | B | — | — |
+| 12 | ScreenShot | F11 | — | — |
+
+`Pad 21..24` are pad buttons 0..3, i.e. A = Jump, B = StickToWalls, X = Punch,
+Y = Kick — exactly the order `runtime/input.c` presses them in.
+
+**Consequences for the port** (implemented in `runtime/`):
+
+1. Keys must be injected as DInput device state (and as real Win32 key
+   messages for the `.fdf` parser, which polls `GetKeyboardState`); the window
+   message path alone does nothing.
+2. The menus need a **virtual system cursor**: our `GetCursorPos` used to
+   return `(0,0)` for ever, which is why no menu widget could ever be hit.
+   `runtime/user32.c` now owns a cursor that the touch layer warps (absolute on
+   touch-down) and that the mouse deltas also move, exactly like Windows.
+3. Clicks are DInput mouse buttons. A tap holds button 0 for at least 120 ms
+   (a one-frame tap would be missed by a polled `GetDeviceState`), and the same
+   state is mirrored into `VK_LBUTTON` for `GetKeyState`.
+4. The right-half drag still drives the camera through the mouse's relative
+   axes; the same deltas keep the virtual cursor in step, so the same gesture
+   moves the pointer in menus.
+
 ## 12. Risk plan
 
 | Risk | Likelihood | Mitigation |

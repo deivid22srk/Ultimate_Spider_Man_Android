@@ -631,7 +631,11 @@ SHIM(RegisterClipboardFormatA) {
 }
 
 SHIM(GetDesktopWindow) { RET(FAKE_HWND, 0); }
-SHIM(ClipCursor) { RET(1, 1); }
+SHIM(ClipCursor) {
+    extern void user32_clip_cursor(uint32_t);
+    user32_clip_cursor(ARG(0));
+    RET(1, 1);
+}
 SHIM(SetFocus) { RET(0, 1); }
 SHIM(GetFocus) { RET(0, 0); }
 SHIM(IsWindow) { RET(ARG(0) ? 1 : 0, 1); }
