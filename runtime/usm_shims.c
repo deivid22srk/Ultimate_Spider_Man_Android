@@ -985,13 +985,34 @@ void usm_dump_state(void) {
     uint32_t buckets = M32(map + 0x14);
     if (buckets >= 0x1000 && buckets < 0x40000000u) {
         fprintf(stderr, "usm: buckets@%08x:", buckets);
-        for (int i = 0; i < 16; i++) fprintf(stderr, " %08x", M32(buckets + 4 * i));
+        for (int i = 0; i < 18; i++) fprintf(stderr, " %08x", M32(buckets + 4 * i));
         fprintf(stderr, "\n");
     }
+    uint32_t sent = M32(map + 0x8);
+    if (sent >= 0x1000 && sent < 0x40000000u) {
+        fprintf(stderr, "usm: sentinel %08x: next %08x prev %08x %08x %08x\n", sent,
+                M32(sent), M32(sent + 4), M32(sent + 8), M32(sent + 0xC));
+        uint32_t n = M32(sent);
+        for (int i = 0; i < 24 && n != sent; i++) {
+            if (n < 0x1000 || n >= 0x40000000u) {
+                fprintf(stderr, "usm: node[%d] BAD next=%08x\n", i, n);
+                break;
+            }
+            fprintf(stderr, "usm: node[%d] %08x: next %08x prev %08x hash %08x ent %08x (hdr %08x %08x)\n", i, n,
+                    M32(n), M32(n + 4), M32(n + 8), M32(n + 0xC), M32(n - 8), M32(n - 4));
+            n = M32(n);
+        }
+    }
+    { extern void usm_map_watch_dump(void); usm_map_watch_dump(); }
     CPU *c = rt_current_cpu();
     if (!c) return;
     uint32_t str = c->r[6];  /* esi at the call: entity + 0x10 (the name) */
     uint32_t ent = c->r[1] == map ? str - 0x10 : 0;
+    if (ent) {
+        fprintf(stderr, "usm: entity@%08x:", ent);
+        for (int i = 0; i < 16; i++) fprintf(stderr, " %08x", M32(ent + 4 * i));
+        fprintf(stderr, "\n");
+    }
     fprintf(stderr, "usm: entity %08x name@%08x: %08x %08x %08x %08x\n", ent, str,
             M32(str), M32(str + 4), M32(str + 8), M32(str + 12));
     uint32_t p = M32(str);

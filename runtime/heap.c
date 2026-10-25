@@ -55,6 +55,75 @@ static void set_block(uint32_t b, uint32_t size, int used) {
     if (nx < g_top) M32(nx) = size;
 }
 
+
+/* ---- USM entity-name hash_map integrity watch ---------------------------
+ * The game keeps a hash_map at 0x95B79C (node = {next, prev, hash, entity}).
+ * A corrupted link surfaces much later as a crash inside the map code, so
+ * check the list after every heap operation and remember the first time it
+ * is seen broken: that names the operation that corrupted it. */
+static int g_map_watch = 1;
+static int g_map_hard;              /* first hard failure seen */
+static int g_map_soft;              /* walk length != map size */
+static uint32_t g_map_op_ret, g_map_op_ptr, g_map_op_node, g_map_op_i;
+static char g_map_op_name[8], g_map_why[96];
+
+static int on_guest_stack(CPU *c, uint32_t want) {
+    if (!c) return 0;
+    uint32_t sp = c->r[4];
+    for (int i = 0; i < 20; i++)
+        if (M32(sp + 4 * i) == want) return 1;
+    return 0;
+}
+
+void usm_map_watch_note(const char *op, uint32_t ptr) {
+    if (!g_map_watch) return;
+    uint32_t map = 0x95B79Cu;
+    uint32_t sent = M32(map + 0x08), size = M32(map + 0x24), mask = M32(map + 0x20);
+    if (sent < GUEST_HEAP_BASE || sent >= GUEST_HEAP_END) return;
+    if (size > 4096 || mask > 4096) return;
+    uint32_t n = M32(sent);
+    int i = 0;
+    while (n != sent) {
+        if (n < GUEST_HEAP_BASE || n >= GUEST_HEAP_END || i > 400) {
+            if (!g_map_hard) {
+                g_map_hard = 1;
+                CPU *c = rt_current_cpu();
+                g_map_op_ret = c ? M32(c->r[4]) : 0;
+                g_map_op_ptr = ptr;
+                g_map_op_node = n;
+                g_map_op_i = (uint32_t)i;
+                snprintf(g_map_op_name, sizeof g_map_op_name, "%s", op);
+                snprintf(g_map_why, sizeof g_map_why, "node[%d]=%08x", i, n);
+                fprintf(stderr, "usm: MAP BROKEN after %s(%08x) ret=%08x: %s (size %u mask %x)\n",
+                        op, ptr, g_map_op_ret, g_map_why, size, mask);
+            }
+            g_map_watch = 0;
+            return;
+        }
+        n = M32(n);
+        i++;
+    }
+    if (ptr && op[0] == 'm' && on_guest_stack(rt_current_cpu(), 0x5095F6u)) {
+        static int nins;
+        fprintf(stderr, "usm: map insert #%d node=%08x size=%u mask=%x walk=%d\n",
+                ++nins, ptr, size, mask, i);
+    }
+    if ((uint32_t)i != size) {
+        g_map_soft++;
+        if (g_map_soft < 4)
+            fprintf(stderr, "usm: map soft mismatch: walk %d != size %u after %s(%08x)\n",
+                    i, size, op, ptr);
+    }
+}
+
+void usm_map_watch_dump(void) {
+    if (g_map_hard)
+        fprintf(stderr, "usm: first break: %s(%08x) ret=%08x %s (i=%u node=%08x)\n",
+                g_map_op_name, g_map_op_ptr, g_map_op_ret, g_map_why, g_map_op_i, g_map_op_node);
+    else
+        fprintf(stderr, "usm: map watch: no hard break seen (%d soft mismatches)\n", g_map_soft);
+}
+
 uint32_t gmalloc(uint32_t n) {
     uint32_t need = (n + HDR + 15) & ~15u;
     if (need < MINBLK) need = MINBLK;
@@ -76,6 +145,7 @@ uint32_t gmalloc(uint32_t n) {
                 set_block(b, sz, 1);
             }
             pthread_mutex_unlock(&g_heap_lock);
+            usm_map_watch_note("malloc", n);
             return b + HDR;
         }
     }
@@ -90,6 +160,7 @@ uint32_t gmalloc(uint32_t n) {
     set_block(b, need, 1);
     g_last_block = b;
     pthread_mutex_unlock(&g_heap_lock);
+    usm_map_watch_note("malloc", n);
     return b + HDR;
 }
 
@@ -131,11 +202,13 @@ void gfree(uint32_t p) {
         g_last_block = 0;
         if (b > GUEST_HEAP_BASE + 8 && BPREV(b)) g_last_block = b - BPREV(b);
         pthread_mutex_unlock(&g_heap_lock);
+        usm_map_watch_note("free", p);
         return;
     }
     set_block(b, sz, 0);
     link_free(b);
     pthread_mutex_unlock(&g_heap_lock);
+    usm_map_watch_note("free", p);
 }
 
 uint32_t gsize(uint32_t p) {
