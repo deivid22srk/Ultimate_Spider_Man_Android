@@ -82,7 +82,7 @@ bool enabled() {
         g_buttons = 0;
         input_set_virtual(0, 0, 0, 0, 0, 0, 0);
 #ifdef GAME_USM
-        { extern void user32_pointer_fingers(int); user32_pointer_fingers(0); } // let go of the left button
+        user32_pointer_fingers(0); // let go of the left button
 #endif
     }
     g_was_on = on;
@@ -191,10 +191,6 @@ extern "C" void touch_handle_event(const SDL_Event *e) {
      * button: the menus become tappable and the in-game prompts follow the
      * finger. The left button is bound to nothing in game, so the same gesture
      * is harmless there. */
-    extern void user32_screen(int *, int *);
-    extern void user32_cursor_set(int, int);
-    extern void user32_mouse_button(int, int);
-    extern void user32_pointer_fingers(int);
     if (f->ptr && down) {
         int w = 1280, h = 720;
         user32_screen(&w, &h);

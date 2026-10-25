@@ -632,7 +632,6 @@ SHIM(RegisterClipboardFormatA) {
 
 SHIM(GetDesktopWindow) { RET(FAKE_HWND, 0); }
 SHIM(ClipCursor) {
-    extern void user32_clip_cursor(uint32_t);
     user32_clip_cursor(ARG(0));
     RET(1, 1);
 }

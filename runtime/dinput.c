@@ -117,13 +117,12 @@ SHIM(dev_GetDeviceState) {
          * it back with GetCursorPos -- that is how USM's menus find the widget
          * under the pointer. Our relative motion never touched it, so keep the
          * virtual cursor in step (user32.c owns it). */
-        { extern void user32_cursor_add(int, int); user32_cursor_add(x, y); }
+        user32_cursor_add(x, y);
         M32(p) = (uint32_t)x;
         M32(p + 4) = (uint32_t)y;
         M32(p + 8) = 0;
         /* Buttons: the host mouse, plus the ones the touch layer holds down to
          * click the game's UI (which reads the system cursor, see user32.c). */
-        extern uint32_t user32_mouse_buttons(void);
         uint32_t vb = user32_mouse_buttons();
         for (int i = 0; i < 3 && 12 + (uint32_t)i < n; i++)
             M8(p + 12 + i) = ((b & SDL_BUTTON(i + 1)) || (vb & (1u << i))) ? 0x80 : 0;

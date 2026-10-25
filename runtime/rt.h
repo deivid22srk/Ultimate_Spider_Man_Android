@@ -85,4 +85,17 @@ extern char g_save_dir[1024];
 /* Map a Windows path to a host path, resolving case-insensitively. */
 int rt_host_path(const char *win, char *out, size_t outsz);
 
+/* ---- mouse cursor and buttons (runtime/user32.c) ----
+ * Android has no system cursor; the touch layer owns one so the games' UI,
+ * which hit-tests its widgets against GetCursorPos, works with a finger. */
+void user32_screen(int *w, int *h);
+void user32_cursor_set(int x, int y);
+void user32_cursor_add(int dx, int dy);
+void user32_cursor_get(int *x, int *y);
+void user32_mouse_button(int btn, int down);
+uint32_t user32_mouse_buttons(void);
+void user32_pointer_fingers(int n);
+void user32_clip_cursor(uint32_t rect);
+int user32_cursor_clipped(void);
+
 void rt_init_shims(void);
