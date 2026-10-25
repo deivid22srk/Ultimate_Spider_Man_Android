@@ -601,8 +601,14 @@ SHIM(lstrcmpi) { RET((uint32_t)(int32_t)strcasecmp(GSTR(ARG(0)), GSTR(ARG(1))), 
 #define FAKE_HWND 0x00010010u
 
 SHIM(GetKeyboardState) {
-    if (ARG(0)) memset(MEM + ARG(0), 0, 256);
+    extern const uint8_t *user32_vk_states(void);
+    if (ARG(0)) memcpy(MEM + ARG(0), user32_vk_states(), 256);
     RET(1, 1);
+}
+
+SHIM(GetAsyncKeyState) {
+    extern const uint8_t *user32_vk_states(void);
+    RET((user32_vk_states()[ARG(0) & 0xFF] & 0x80) ? 0x8000 : 0, 1);
 }
 
 SHIM(AdjustWindowRectEx) { RET(1, 4); }
@@ -918,7 +924,7 @@ static const ShimDef defs[] = {
 #undef K
 
 #define U(n) {"user32.dll", #n, shim_##n},
-    U(GetKeyboardState) U(AdjustWindowRectEx) U(GetWindowPlacement)
+    U(GetKeyboardState) U(GetAsyncKeyState) U(AdjustWindowRectEx) U(GetWindowPlacement)
     U(SetWindowPlacement) U(OpenClipboard) U(EmptyClipboard) U(SetClipboardData)
     U(CloseClipboard) U(GetDesktopWindow) U(ClipCursor) U(SetFocus)
     U(CreateDialogParamA) U(LoadImageA) U(GetDlgCtrlID) U(GetNextDlgGroupItem)

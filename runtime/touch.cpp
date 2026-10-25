@@ -34,7 +34,7 @@ const Button k_buttons[] = {
 const int NB = sizeof k_buttons / sizeof k_buttons[0];
 const float STICK_X = 0.24f, STICK_Y = -0.26f, STICK_R = 0.17f; // from bottom-left
 
-struct Finger { SDL_FingerID id; int button; bool stick; float x, y; bool used; };
+struct Finger { SDL_FingerID id; int button; bool stick; bool look; float x, y; bool used; };
 Finger g_fingers[10];
 float g_stick_x, g_stick_y;   // knob offset, -1..1
 bool g_available, g_decided, g_seen, g_was_on;
@@ -167,8 +167,23 @@ extern "C" void touch_handle_event(const SDL_Event *e) {
         f->button = hit_button(x, y);
         // anything on the left half that is not a button drives the stick
         f->stick = f->button < 0 && x < 0.5f;
+#ifdef GAME_USM
+        /* USM has no pad support: the overlay presses keys, and a finger on
+         * the right half drags the camera (the game reads the mouse). */
+        f->stick = f->button < 0 && x < 0.45f;
+        f->look = f->button < 0 && x >= 0.45f;
+#endif
     }
     if (!f) return;
+#ifdef GAME_USM
+    if (!down && !up && f->look) {
+        int w = 0, h = 0;
+        extern void platform_window_size(int *, int *);
+        extern void platform_mouse_add(int, int);
+        platform_window_size(&w, &h);
+        platform_mouse_add((int)((x - f->x) * w * 2.f), (int)((y - f->y) * h * 2.f));
+    }
+#endif
     f->x = x;
     f->y = y;
     if (up) f->used = false;

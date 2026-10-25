@@ -133,6 +133,88 @@ static void fill_state(int idx, uint32_t g) {
 
 static int connected(uint32_t i) { return i == 0 || (i < 4 && g_pads[i]); }
 
+#ifdef GAME_USM
+/* Ultimate Spider-Man (2005) reads the keyboard and the mouse only: its pad
+ * support goes through DirectInput gamepads, which we do not provide (the
+ * shim only exposes a keyboard and a mouse). So the touch overlay and any
+ * real controller press the game's default keys (from its binding table at
+ * 0x88D648: Forward=W, Backward=S, TurnLeft=A, TurnRight=D, Jump=Space,
+ * Punch=Q, Kick=E, ThrowWeb=C, StickToWalls=F, BlackButton=V, Pause=Esc,
+ * BackButton=M) and the right stick moves the mouse for the camera. */
+static const struct { uint16_t bit; uint8_t dik, vk; } k_usm_keys[] = {
+    {0x1000, 0x39, 0x20}, /* A -> Space: jump */
+    {0x2000, 0x2E, 0x43}, /* B -> C: throw web */
+    {0x4000, 0x10, 0x51}, /* X -> Q: punch */
+    {0x8000, 0x12, 0x45}, /* Y -> E: kick */
+    {0x0100, 0x21, 0x46}, /* LB -> F: stick to walls */
+    {0x0200, 0x2F, 0x56}, /* RB -> V: black button */
+    {0x0010, 0x01, 0x1B}, /* Start -> Esc: pause */
+    {0x0020, 0x32, 0x4D}, /* Back -> M */
+};
+/* stick directions press both the letter and the arrow the game binds */
+static const struct { int axis, sign; uint8_t dik, vk; } k_usm_stick[] = {
+    {1, +1, 0x11, 0x57}, /* up: W */    {1, +1, 0xC8, 0x26}, /* up: Up */
+    {1, -1, 0x1F, 0x53}, /* down: S */  {1, -1, 0xD0, 0x28}, /* down: Down */
+    {0, -1, 0x1E, 0x41}, /* left: A */  {0, -1, 0xCB, 0x25}, /* left: Left */
+    {0, +1, 0x20, 0x44}, /* right: D */ {0, +1, 0xCD, 0x27}, /* right: Right */
+};
+static uint16_t g_usm_b;
+static int16_t g_usm_lx, g_usm_ly, g_usm_rx, g_usm_ry;
+
+void usm_input_update(void) {
+    extern void platform_vk_set(uint32_t, int);
+    extern void platform_mouse_add(int, int);
+    extern void user32_key_event(uint32_t vk, uint32_t sc, int down);
+    uint16_t b = g_virt.buttons;
+    int16_t lx = g_virt.lx, ly = g_virt.ly, rx = g_virt.rx, ry = g_virt.ry;
+    SDL_GameController *p = g_pads[0];
+    if (p) {
+        static const struct { SDL_GameControllerButton b; uint16_t bit; } map[] = {
+            {SDL_CONTROLLER_BUTTON_DPAD_UP, 0x1}, {SDL_CONTROLLER_BUTTON_DPAD_DOWN, 0x2},
+            {SDL_CONTROLLER_BUTTON_DPAD_LEFT, 0x4}, {SDL_CONTROLLER_BUTTON_DPAD_RIGHT, 0x8},
+            {SDL_CONTROLLER_BUTTON_START, 0x10}, {SDL_CONTROLLER_BUTTON_BACK, 0x20},
+            {SDL_CONTROLLER_BUTTON_LEFTSTICK, 0x40}, {SDL_CONTROLLER_BUTTON_RIGHTSTICK, 0x80},
+            {SDL_CONTROLLER_BUTTON_LEFTSHOULDER, 0x100}, {SDL_CONTROLLER_BUTTON_RIGHTSHOULDER, 0x200},
+            {SDL_CONTROLLER_BUTTON_A, 0x1000}, {SDL_CONTROLLER_BUTTON_B, 0x2000},
+            {SDL_CONTROLLER_BUTTON_X, 0x4000}, {SDL_CONTROLLER_BUTTON_Y, 0x8000},
+        };
+        for (unsigned i = 0; i < sizeof map / sizeof map[0]; i++)
+            if (SDL_GameControllerGetButton(p, map[i].b)) b |= map[i].bit;
+        int ax = SDL_GameControllerGetAxis(p, SDL_CONTROLLER_AXIS_LEFTX);
+        int ay = SDL_GameControllerGetAxis(p, SDL_CONTROLLER_AXIS_LEFTY);
+        if (ax > 8000 || ax < -8000) lx = (int16_t)ax;
+        if (ay > 8000 || ay < -8000) ly = (int16_t)~ay; /* SDL: down is positive */
+        int sx = SDL_GameControllerGetAxis(p, SDL_CONTROLLER_AXIS_RIGHTX);
+        int sy = SDL_GameControllerGetAxis(p, SDL_CONTROLLER_AXIS_RIGHTY);
+        if (sx > 4000 || sx < -4000 || sy > 4000 || sy < -4000)
+            platform_mouse_add(sx / 3000, sy / 3000);
+    }
+    if (b != g_usm_b) {
+        for (unsigned i = 0; i < sizeof k_usm_keys / sizeof k_usm_keys[0]; i++) {
+            int was = (g_usm_b & k_usm_keys[i].bit) != 0, is = (b & k_usm_keys[i].bit) != 0;
+            if (was == is) continue;
+            platform_vk_set(k_usm_keys[i].dik, is);
+            user32_key_event(k_usm_keys[i].vk, k_usm_keys[i].dik, is);
+        }
+        g_usm_b = b;
+    }
+    /* deadzone; the stick only reports changes when it crosses a direction */
+    const int DZ = 12000;
+    int dir[4] = {ly > DZ, ly < -DZ, lx < -DZ, lx > DZ};
+    int olddir[4] = {g_usm_ly > DZ, g_usm_ly < -DZ, g_usm_lx < -DZ, g_usm_lx > DZ};
+    for (int i = 0; i < 4; i++) {
+        if (dir[i] == olddir[i]) continue;
+        /* each direction is bound twice (letter + arrow), adjacent in the table */
+        int k = i * 2;
+        for (int j = 0; j < 2; j++) {
+            platform_vk_set(k_usm_stick[k + j].dik, dir[i]);
+            user32_key_event(k_usm_stick[k + j].vk, k_usm_stick[k + j].dik, dir[i]);
+        }
+    }
+    g_usm_lx = lx; g_usm_ly = ly; g_usm_rx = rx; g_usm_ry = ry;
+}
+#endif
+
 SHIM(XInputGetState) {
     uint32_t i = ARG(0);
     if (!connected(i)) RET(1167, 2);

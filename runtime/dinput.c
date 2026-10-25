@@ -87,6 +87,8 @@ SHIM(dev_GetDeviceState) {
     DIDev *d = hcom_host(ARG(0));
     uint32_t n = ARG(1), p = ARG(2);
     memset(MEM + p, 0, n);
+    extern const uint8_t *platform_virtual_dik(void);
+    const uint8_t *vd = platform_virtual_dik();
     if (d->kind == DEV_KEYBOARD) {
         int nk;
         const Uint8 *ks = platform_keys(&nk);
@@ -95,9 +97,12 @@ SHIM(dev_GetDeviceState) {
                 uint8_t k = dik_of((SDL_Scancode)i);
                 if (k && k < n) M8(p + k) = 0x80;
             }
+        for (uint32_t k = 0; k < 256 && k < n; k++)
+            if (vd[k]) M8(p + k) = 0x80;
     } else {
         int x, y;
         Uint32 b = SDL_GetRelativeMouseState(&x, &y);
+        { extern void platform_mouse_take(int *, int *); int dx, dy; platform_mouse_take(&dx, &dy); x += dx; y += dy; }
         M32(p) = (uint32_t)x;
         M32(p + 4) = (uint32_t)y;
         M32(p + 8) = 0;
@@ -116,6 +121,10 @@ static void dik_state(uint8_t out[256]) {
             uint8_t k = dik_of((SDL_Scancode)i);
             if (k) out[k] = 0x80;
         }
+    extern const uint8_t *platform_virtual_dik(void);
+    const uint8_t *vd = platform_virtual_dik();
+    for (int k = 0; k < 256; k++)
+        if (vd[k]) out[k] = 0x80;
 }
 SHIM(dev_GetDeviceData) {
     DIDev *d = hcom_host(ARG(0));

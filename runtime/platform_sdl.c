@@ -86,6 +86,20 @@ static uint32_t vk_of(SDL_Scancode s) {
     }
 }
 
+/* Virtual keyboard/mouse state fed by the touch overlay and the physical
+ * pad (games that only read DirectInput's keyboard, like USM). */
+static uint8_t g_vdik[256];
+static int g_mdx, g_mdy;
+void platform_vk_set(uint32_t dik, int down) {
+    if (dik < 256) g_vdik[dik] = down ? 0x80 : 0;
+}
+const uint8_t *platform_virtual_dik(void) { return g_vdik; }
+void platform_mouse_add(int dx, int dy) { g_mdx += dx; g_mdy += dy; }
+void platform_mouse_take(int *dx, int *dy) {
+    *dx = g_mdx; *dy = g_mdy;
+    g_mdx = g_mdy = 0;
+}
+
 static void key_event(SDL_Scancode sc, int down) {
     extern void user32_key_event(uint32_t vk, uint32_t sc, int down);
     uint32_t vk = vk_of(sc);
@@ -163,9 +177,18 @@ static void poll_key_fifo(void) {
 #endif
 }
 
-void platform_present_hook(void) {
+/* Pumps and dispatches SDL events. Called from Present *and* from
+ * PeekMessageA: when the game loses activation it stops presenting and spins
+ * on PeekMessageA, so pumping only from Present meant it never saw the
+ * "back in the foreground" event and stayed frozen on the last frame. */
+void platform_pump_events(void) {
+    static pthread_mutex_t mu = PTHREAD_MUTEX_INITIALIZER;
+    static uint32_t last_ms;
+    uint32_t now = SDL_GetTicks();
+    if (now == last_ms) return;            /* at most once a millisecond */
+    if (pthread_mutex_trylock(&mu)) return;
+    last_ms = now;
     SDL_Event e;
-    poll_key_fifo();
     while (SDL_PollEvent(&e)) {
         if (e.type == SDL_QUIT) {
             LOG("quit requested");
@@ -179,11 +202,30 @@ void platform_present_hook(void) {
             if (e.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) user32_focus(1);
             else if (e.window.event == SDL_WINDOWEVENT_FOCUS_LOST) user32_focus(0);
         }
+        /* Android pause/resume: SDL reports these even when the window never
+         * sees a focus event (the app is paused, so nothing presents). */
+        if (e.type == SDL_APP_DIDENTERFOREGROUND) {
+            extern void user32_focus(int);
+            user32_focus(1);
+        }
+        if (e.type == SDL_APP_WILLENTERBACKGROUND) {
+            extern void user32_focus(int);
+            user32_focus(0);
+        }
         extern void input_handle_event(const SDL_Event *e);
         input_handle_event(&e);
         extern void touch_handle_event(const SDL_Event *e);
         touch_handle_event(&e);
     }
+#ifdef GAME_USM
+    { extern void usm_input_update(void); usm_input_update(); }
+#endif
+    pthread_mutex_unlock(&mu);
+}
+
+void platform_present_hook(void) {
+    poll_key_fifo();
+    platform_pump_events();
     script_events();
     g_frames++;
 #ifdef GAME_SKYRIM

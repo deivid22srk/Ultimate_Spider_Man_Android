@@ -116,15 +116,24 @@ static void post_msg(uint32_t msg, uint32_t wp, uint32_t lp) {
     pthread_mutex_unlock(&g_qlock);
 }
 
+/* Live virtual-key state, so GetKeyboardState/GetAsyncKeyState agree with
+ * the key messages (the .fdf parser and the options screen poll them). */
+static uint8_t g_vk_state[256];
+const uint8_t *user32_vk_states(void) { return g_vk_state; }
+
 /* vk: Windows virtual-key code; sc: PC set-1 scan code */
 void user32_key_event(uint32_t vk, uint32_t sc, int down) {
     if (!vk) return;
+    if (vk < 256) g_vk_state[vk] = down ? 0x80 : 0;
     uint32_t lp = 1 | (sc & 0xFF) << 16 | (down ? 0 : 0xC0000000u);
     post_msg(down ? 0x100 : 0x101, vk, lp); /* WM_KEYDOWN / WM_KEYUP */
 }
 
 SHIM(PeekMessageA) {
     uint32_t m = ARG(0), remove = ARG(4) & 1;
+    /* The game idles in this call (no Present, so no frames) when it thinks
+     * it is inactive: keep the SDL event pump running so resume/keys arrive. */
+    { extern void platform_pump_events(void); platform_pump_events(); }
     if (g_quit == 1) {
         /* deliver WM_QUIT once */
         memset(MEM + m, 0, 28);
