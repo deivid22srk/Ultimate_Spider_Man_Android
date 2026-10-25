@@ -125,7 +125,7 @@ void usm_map_watch_note(const char *op, uint32_t req, uint32_t ptr) {
     uint32_t n = M32(sent);
     int i = 0;
     while (n != sent) {
-        if (n < GUEST_HEAP_BASE || n >= GUEST_HEAP_END || i > 400) {
+        if (n < GUEST_HEAP_BASE || n >= GUEST_HEAP_END) {
             if (!g_map_hard) {
                 g_map_hard = 1;
                 CPU *c = rt_current_cpu();
@@ -143,8 +143,13 @@ void usm_map_watch_note(const char *op, uint32_t req, uint32_t ptr) {
             g_map_watch = 0;
             return;
         }
+        if (++i > 8192) {
+            /* the entity map outgrew the watch (1000+ entries once the game
+             * is up): stop walking every heap op instead of misreporting */
+            g_map_watch = 0;
+            return;
+        }
         n = M32(n);
-        i++;
     }
     if (req == 16 && op[0] == 'm' && on_guest_stack(rt_current_cpu(), 0x5095F6u)) {
         static int nins;

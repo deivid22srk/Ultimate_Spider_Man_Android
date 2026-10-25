@@ -234,8 +234,23 @@ SHIM(strtok) {
 }
 
 SHIM(strcspn) { RETC(strcspn(GSTR(ARG(0)), GSTR(ARG(1)))); }
-SHIM(strtol) { RETC((int32_t)strtol(GSTR(ARG(0)), NULL, (int)ARG(2))); }
-SHIM(strtoul) { RETC((uint32_t)strtoul(GSTR(ARG(0)), NULL, (int)ARG(2))); }
+SHIM(strtol) {
+    /* MSVC's strtol always writes the end pointer; the .fdf font parser
+     * walks its buffer with it, so leaving it untouched desyncs the scan
+     * and makes it write glyphs out of bounds (heap corruption). */
+    char *end = NULL;
+    const char *s = GSTR(ARG(0));
+    long v = strtol(s, &end, (int)ARG(2));
+    if (ARG(1)) M32(ARG(1)) = ARG(0) + (uint32_t)(end - s);
+    RETC((int32_t)v);
+}
+SHIM(strtoul) {
+    char *end = NULL;
+    const char *s = GSTR(ARG(0));
+    unsigned long v = strtoul(s, &end, (int)ARG(2));
+    if (ARG(1)) M32(ARG(1)) = ARG(0) + (uint32_t)(end - s);
+    RETC((uint32_t)v);
+}
 SHIM(_strcmpi) { RETC(strcasecmp(GSTR(ARG(0)), GSTR(ARG(1)))); }
 SHIM(_strnicmp) { RETC(strncasecmp(GSTR(ARG(0)), GSTR(ARG(1)), ARG(2))); }
 

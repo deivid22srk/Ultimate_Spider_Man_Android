@@ -211,6 +211,13 @@ static int bink_test(CPU *c, const char *movie, const char *outdir) {
 static void on_crash(int sig, siginfo_t *si, void *uc) {
     (void)uc;
     fprintf(stderr, "CRASH: signal %d at address %p\n", sig, si->si_addr);
+    fprintf(stderr, "  guest mem base %p (fault guest addr %08x)\n", (void *)MEM,
+            (uint32_t)((uintptr_t)si->si_addr - (uintptr_t)MEM));
+    extern void rt_dump_guest(void);
+    rt_dump_guest();
+#if defined(GAME_USM)
+    { extern void usm_dump_state(void); usm_dump_state(); }
+#endif
     void *bt[64];
     int n = backtrace(bt, 64);
     backtrace_symbols_fd(bt, n, 2);
