@@ -106,21 +106,30 @@ push.
 ### Building the full APK
 
 `gen/` is derived from your own copy of the game and must never be published
-(it is git-ignored). Build the full APK in a **private fork** of this
-repository, or locally:
+(it is git-ignored), so the full build keeps it in a **private repository** and
+lets this public repository's CI (free on public repos) fetch it:
 
-```sh
-# private fork of this repo, with your own gen/ produced by tools/regen_gen.sh
-git add -f gen            # only in your private fork, never here
-git commit -m "local gen"
-gh workflow run build.yml -f lb_gen_jobs=2 --repo <you>/<your-private-fork>
-gh run watch --repo <you>/<your-private-fork>
-gh run download --repo <you>/<your-private-fork>
-```
+1. `tools/regen_gen.sh` produces `gen/` from your copy of the game.
+2. Pack it and upload it to a private repository as a release asset:
+   ```sh
+   tar -I zstd -cf gen.tar.zst gen
+   gh release create gen-$(date +%Y%m%d) gen.tar.zst --repo <you>/USM_gen
+   ```
+3. In this repository set the variables and the secret the workflow reads:
+   ```sh
+   gh variable set GEN_REPO --body <you>/USM_gen
+   gh variable set GEN_TAG  --body gen-$(date +%Y%m%d)
+   gh secret   set GEN_TOKEN --body "<a token with repo scope on <you>/USM_gen>"
+   ```
+4. `gh workflow run build.yml` (or push). The run downloads `gen.tar.zst`,
+   builds the APK and publishes it as an asset of a **private** release in
+   `GEN_REPO` (`apk-<run>-<date>`). Nothing game-derived is uploaded here.
 
-The workflow compiles whatever is in `gen/`: with `ci/gen_stub` it makes the
-app-only APK, with a real `gen/` it makes the full one. Locally, the same build
-is `cd android && ./gradlew assembleDebug -PndkVersion=27.2.12479018 -PlbGenJobs=2`.
+Without `GEN_REPO` the workflow builds the app-only APK and uploads it as a
+public artifact, which is safe because it contains no game code.
+
+Locally the same build is `cd android && ./gradlew assembleDebug -PndkVersion=27.2.12479018 -PlbGenJobs=2`
+with a real `gen/` in place.
 
 `LB_GEN_JOBS` caps how many recompiled files are compiled at once (each needs
 ~1.5 GB of RAM). The APK is signed with the debug key (fine for personal use,

@@ -2,19 +2,20 @@ name: build
 
 # The APK is only ever built here, never on a developer machine.
 #
-# Strategy B: this repository is public and contains no game code and no code
-# generated from the game. The workflow therefore builds the launcher and the
-# runtime against ci/gen_stub (empty recompiled tables):
+# Two modes, chosen by the repository variable GEN_REPO:
 #
-#   * the APK installs, the launcher validates your game folder and the exe
-#     build, and "Play" stops with a clear message;
-#   * it proves the whole Android/runtime build works, on every push.
+#   full      GEN_REPO set (e.g. deivid22srk/USM_gen): the workflow downloads
+#             gen.tar.zst from that *private* repository's release GEN_TAG using
+#             the GEN_TOKEN secret, builds the real APK (game code included) and
+#             publishes it as an asset of a *private* release in GEN_REPO. No
+#             game code ever reaches this public repository or its artifacts.
 #
-# The full APK (with the game's recompiled code) is built from gen/, which is
-# derived from your own copy of the game and must never be published. Do that
-# in a private fork of this repository (drop gen/ in, the same workflow then
-# compiles it), or build locally with Android Studio / gradlew. See README,
-# "Building the full APK".
+#   app-only  GEN_REPO unset: builds the launcher + runtime against
+#             ci/gen_stub (empty tables). Installs and validates the game folder;
+#             Play stops with a clear message. Uploaded as a public artifact.
+#
+# gen/ is derived from the game and must never be committed, released or
+# uploaded here.
 
 on:
   workflow_dispatch:
@@ -30,7 +31,7 @@ on:
 jobs:
   apk:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 300
     permissions:
       contents: read
     steps:
@@ -57,8 +58,24 @@ jobs:
           ls "$ANDROID_HOME/ndk"
           cmake --version | head -1
 
-      # No game code in this repository: gen/ is either the stub (public CI) or
-      # the real, git-ignored gen/ when this workflow runs in a private fork.
+      - name: Fetch recompiled game code (private repository)
+        if: ${{ vars.GEN_REPO != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GEN_TOKEN }}
+          GEN_REPO: ${{ vars.GEN_REPO }}
+          GEN_TAG: ${{ vars.GEN_TAG }}
+        run: |
+          set -euo pipefail
+          test -n "${GH_TOKEN:-}" || { echo "GEN_TOKEN secret is missing"; exit 1; }
+          echo "fetching $GEN_TAG from $GEN_REPO"
+          gh release download "$GEN_TAG" --repo "$GEN_REPO" \
+            --pattern 'gen.tar.zst' --output gen.tar.zst --clobber
+          ls -l gen.tar.zst
+          rm -rf gen && mkdir gen
+          tar -I zstd -xf gen.tar.zst -C .
+          rm -f gen.tar.zst
+          echo "recompiled files: $(ls gen/*.c | wc -l)"
+
       - name: Use stub tables when gen/ is absent
         run: |
           if [ -z "$(ls -A gen 2>/dev/null)" ]; then
@@ -84,9 +101,33 @@ jobs:
           mkdir -p out
           cp android/app/build/outputs/apk/debug/app-debug.apk out/UltimateSpiderMan.apk
           ls -l out
+          sha256sum out/UltimateSpiderMan.apk | tee out/UltimateSpiderMan.apk.sha256
 
+      # Full build: the APK is published to the private repository, never here.
+      - name: Publish APK to the private repository
+        if: ${{ vars.GEN_REPO != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GEN_TOKEN }}
+          GEN_REPO: ${{ vars.GEN_REPO }}
+        run: |
+          set -euo pipefail
+          tag="apk-${GITHUB_RUN_NUMBER}-$(date -u +%Y%m%d-%H%M)"
+          sha="$(cut -d' ' -f1 out/UltimateSpiderMan.apk.sha256)"
+          gh release create "$tag" out/UltimateSpiderMan.apk \
+            --repo "$GEN_REPO" \
+            --title "APK $tag" \
+            --notes "Built by ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+
+          sha256: $sha
+          Install on arm64 Android 9+ and point the launcher at your own copy of the game."
+          echo "published to https://github.com/$GEN_REPO/releases/tag/$tag"
+
+      # App-only build: safe to hand out publicly (contains no game code).
       - uses: actions/upload-artifact@v4
+        if: ${{ vars.GEN_REPO == '' }}
         with:
           name: UltimateSpiderMan-apk
-          path: out/UltimateSpiderMan.apk
+          path: |
+            out/UltimateSpiderMan.apk
+            out/UltimateSpiderMan.apk.sha256
           if-no-files-found: error
