@@ -14,6 +14,9 @@
 *.dat
 Game*/
 game/
+# ...except the build glue for the recompiled code (not a game file):
+!android/app/jni/game/
+!android/app/jni/game/CMakeLists.txt
 Ultimate_Spider_Man*/
 Data/
 data/

@@ -441,3 +441,6 @@ void msvcrt_init(void) {
     rt_register_data("msvcrt.dll", "__pioinfo", g_pioinfo);
     rt_register_data("msvcrt.dll", "__badioinfo", g_badioinfo);
 }
+
+/* USM.exe (MSVC 7.1) imports the same CRT as msvcr71.dll. */
+void msvcrt_register_as_msvcr71(void) { rt_register_shims_alias(defs, "msvcr71.dll"); }

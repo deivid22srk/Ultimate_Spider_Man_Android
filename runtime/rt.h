@@ -45,6 +45,8 @@ uint32_t rt_import(const char *dll, const char *name);
 uint32_t rt_import_opt(const char *dll, const char *name);
 void rt_register_data(const char *dll, const char *name, uint32_t addr);
 void rt_register_shims(const ShimDef *defs);
+void rt_register_shims_alias(const ShimDef *defs, const char *dll);
+size_t guest_vformat(char *out, size_t cap, const char *fmt, uint32_t argp);
 
 /* Call a guest function from the host with stdcall/cdecl args already chosen. */
 uint32_t rt_invoke(CPU *c, uint32_t fn, int nargs, const uint32_t *args);

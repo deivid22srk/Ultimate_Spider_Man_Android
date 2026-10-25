@@ -17,6 +17,19 @@ void rt_register_shims(const ShimDef *defs) {
     }
 }
 
+/* Register the same implementations under another DLL name. USM.exe imports
+ * the VC7.1 CRT as msvcr71.dll, which is the same API as msvcrt.dll. */
+void rt_register_shims_alias(const ShimDef *defs, const char *dll) {
+    for (; defs->name; defs++) {
+        ShimDef *d = malloc(sizeof *d);
+        d->dll = dll;
+        d->name = defs->name;
+        d->fn = defs->fn;
+        if (g_ndefs >= MAX_DEFS) rt_fatal("too many shims");
+        g_defs[g_ndefs++] = d;
+    }
+}
+
 static const char *dll_base(const char *dll, char *buf, size_t n) {
     /* "C:\\x\\KERNEL32.DLL" -> "kernel32" */
     const char *p = strrchr(dll, '\\');
@@ -97,6 +110,7 @@ void msvcrt_init(void);
 void marvel_shims_init(void);
 void skyrim_shims_init(void);
 void xaudio2_init(void);
+void usm_shims_init(void);
 
 void rt_init_shims(void) {
     k32_init();
@@ -110,4 +124,5 @@ void rt_init_shims(void) {
     marvel_shims_init();
     skyrim_shims_init();
     xaudio2_init();
+    usm_shims_init();
 }
