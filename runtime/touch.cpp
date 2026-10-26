@@ -118,19 +118,19 @@ bool g_hud_ctx;
 // advance the hysteresis eight times per frame and latch almost immediately.
 bool g_hud_menu;
 
-extern "C" uint32_t d3d9_last_frame_draws(void);
-
 // Menu = the game is not drawing the world. Measured, not inferred: USM's
 // front end never calls GetCursorPos (0 calls in a whole session on device,
 // see docs/RECON.md) and never moves the ShowCursor counter, so the two
 // "obvious" signals the port used to poll were dead on this game -- the
 // overlay sat in "game" forever and the contextual HUD never appeared.
-// What does differ is the frame the guest composes: a menu is a few dozen
-// primitives, a frame of the world is hundreds. So count the guest's draw
-// calls per frame in the D3D9 bridge and switch on the ratio, with enough
+// What does differ is the frame the guest composes, so count the guest's draw
+// calls per frame in the D3D9 bridge and switch on that, with enough
 // hysteresis that one light frame (a fade, a HUD-only pass) cannot flip it.
+// Measured on device: the front end composes 1..2 draws per frame, a frame of
+// the world 25..444. The first threshold of 32 sat inside the gameplay range
+// and flipped the overlay to "menu" mid-game; 8 is clear of both ends.
 #ifndef HUD_MENU_DRAWS
-#define HUD_MENU_DRAWS 32   /* below this many draws a frame looks like a menu */
+#define HUD_MENU_DRAWS 8
 #endif
 bool hud_menu_step() {
 #ifdef GAME_USM
@@ -533,9 +533,14 @@ void touch_draw(IDirect3DDevice9 *d) {
 
     if (!g_art_tried) load_atlas(d);
 
-    /* Plain discs only: no artist icons, so nothing is drawn twice. */
-    Vtx vd[6 * (NB + 6)];   /* stick, knob, NB buttons, camera hint, 2 cursor discs */
-    int nd = 0;
+    /* Two batches: the plain discs (soft-edged texture) and the icon pack (the
+     * atlas). A button is drawn exactly once -- with its action icon when the
+     * pack has one, with the disc when it does not -- and never at all while
+     * the contextual HUD hides it. The stick stays procedural on purpose: the
+     * analog needs no art, so a missing pack can never take it away. */
+    Vtx vd[6 * (NB + 6)];   /* stick, knob, disc fallbacks, camera hint, 2 cursor discs */
+    Vtx va[6 * (NB + 4)];   /* button icons, camera hint, cursor */
+    int nd = 0, na = 0;
     float sx, sy;
     stick_pos(&sx, &sy);
     quad(vd + 6 * nd++, sx, sy, STICK_R, w, h, dim(0x90FFFFFF));
@@ -546,8 +551,17 @@ void touch_draw(IDirect3DDevice9 *d) {
         float bx, by;
         button_pos(k_buttons[i], &bx, &by);
         bool on = (g_buttons & k_buttons[i].bit) != 0;
-        quad(vd + 6 * nd++, bx, by, k_buttons[i].r, w, h,
-             dim((k_buttons[i].color & 0xFFFFFF) | (on ? 0xF0u : 0x90u) << 24));
+        char press[32];
+        snprintf(press, sizeof press, "on/%s", k_button_icon[i]);
+        const ArtEntry *a = (on ? art(press) : nullptr);
+        if (!a) a = art(k_button_icon[i]);
+        if (a && g_atlas) {
+            art_quad(va + 6 * na++, a, bx, by, k_buttons[i].r * 1.06f, w, h,
+                     dim(on ? 0xFFFFFFFF : 0xE0FFFFFF));
+        } else {
+            quad(vd + 6 * nd++, bx, by, k_buttons[i].r, w, h,
+                 dim((k_buttons[i].color & 0xFFFFFF) | (on ? 0xF0u : 0x90u) << 24));
+        }
     }
 #ifdef GAME_USM
     /* Camera zone hint: only while the finger is dragging there. */
@@ -567,6 +581,10 @@ void touch_draw(IDirect3DDevice9 *d) {
     if (nd) {
         d->SetTexture(0, g_tex);
         d->DrawPrimitiveUP(D3DPT_TRIANGLELIST, 2 * nd, vd, sizeof(Vtx));
+    }
+    if (na && g_atlas) {
+        d->SetTexture(0, g_atlas);
+        d->DrawPrimitiveUP(D3DPT_TRIANGLELIST, 2 * na, va, sizeof(Vtx));
     }
     d->EndScene();
     d->SetRenderTarget(0, old);
