@@ -928,8 +928,10 @@ public class UsmLauncherActivity extends Activity {
         Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         i.addCategory(Intent.CATEGORY_OPENABLE);
         i.setType("*/*");
-        i.putExtra(Intent.EXTRA_MIME_TYPES,
-                new String[] { "application/zip", "application/x-zip-compressed" });
+        /* zip packs and a bare libvulkan.so are both accepted here; some file
+         * managers hand .so over as application/octet-stream, hence the list. */
+        i.putExtra(Intent.EXTRA_MIME_TYPES, new String[] {
+                "application/zip", "application/x-zip-compressed", "application/octet-stream" });
         try {
             startActivityForResult(i, REQ_DRIVER);
         } catch (ActivityNotFoundException e) {
@@ -951,15 +953,23 @@ public class UsmLauncherActivity extends Activity {
 
     private static String slug(String name) {
         String n = name == null ? "driver" : name;
-        if (n.toLowerCase().endsWith(".zip")) n = n.substring(0, n.length() - 4);
+        String low = n.toLowerCase();
+        if (low.endsWith(".zip")) n = n.substring(0, n.length() - 4);
+        else if (low.contains(".so")) n = n.substring(0, low.indexOf(".so"));
         n = n.replaceAll("[^A-Za-z0-9._-]", "-").replaceAll("-{2,}", "-");
         if (n.isEmpty() || n.equals(".") || n.equals("..")) n = "driver";
         return n.length() > 40 ? n.substring(0, 40) : n;
     }
 
-    /* The pack is a zip with libvulkan.so somewhere inside (usually at the top,
-     * sometimes in a folder). Extract out of the UI thread and only then look
-     * for the library, so a broken or huge archive cannot lock the launcher. */
+    /* A driver pack is one of:
+     *   - a zip with the library somewhere inside (top level or a folder),
+     *   - the library itself, picked straight out of the file manager.
+     * AdrenoTools packs name it libvulkan.so; Mesa's Turnip builds ship
+     * libvulkan_freedreno.so. Both are accepted and the result is exposed as
+     * libvulkan.so, because that is the name libadrenotools opens in
+     * runtime/driver_android.cpp.
+     * Extraction runs off the UI thread, so a huge or broken archive cannot
+     * lock the launcher. */
     private void unpackDriver(final Uri uri) {
         final String label = displayName(uri);
         new Thread(() -> {
@@ -968,30 +978,51 @@ public class UsmLauncherActivity extends Activity {
             tmp.mkdirs();
             String err = null;
             int files = 0;
-            try (java.io.InputStream in = getContentResolver().openInputStream(uri);
-                 java.util.zip.ZipInputStream z = new java.util.zip.ZipInputStream(in)) {
-                if (z == null || in == null) throw new java.io.IOException("não foi possível abrir o arquivo");
-                byte[] buf = new byte[1 << 16];
-                java.util.zip.ZipEntry e;
-                while ((e = z.getNextEntry()) != null) {
-                    String n = e.getName().replace('\\', '/');
-                    if (n.startsWith("/") || n.contains("..")) continue;
-                    File out = new File(tmp, n);
-                    if (e.isDirectory()) { out.mkdirs(); continue; }
-                    File parent = out.getParentFile();
-                    if (parent != null) parent.mkdirs();
-                    try (java.io.FileOutputStream fo = new java.io.FileOutputStream(out)) {
-                        int r;
-                        while ((r = z.read(buf)) > 0) fo.write(buf, 0, r);
+            try (java.io.InputStream rawIn = getContentResolver().openInputStream(uri)) {
+                if (rawIn == null) throw new java.io.IOException("não foi possível abrir o arquivo");
+                java.io.BufferedInputStream in = new java.io.BufferedInputStream(rawIn, 1 << 16);
+                in.mark(8);
+                int b0 = in.read(), b1 = in.read();
+                in.reset();
+                if (b0 == 'P' && b1 == 'K') {
+                    try (java.util.zip.ZipInputStream z = new java.util.zip.ZipInputStream(in)) {
+                        byte[] buf = new byte[1 << 16];
+                        java.util.zip.ZipEntry e;
+                        while ((e = z.getNextEntry()) != null) {
+                            String n = e.getName().replace('\\', '/');
+                            if (n.startsWith("/") || n.contains("..") || n.startsWith("__MACOSX/")) continue;
+                            File out = new File(tmp, n);
+                            if (e.isDirectory()) { out.mkdirs(); continue; }
+                            File parent = out.getParentFile();
+                            if (parent != null) parent.mkdirs();
+                            try (java.io.FileOutputStream fo = new java.io.FileOutputStream(out)) {
+                                int r;
+                                while ((r = z.read(buf)) > 0) fo.write(buf, 0, r);
+                            }
+                            files++;
+                        }
                     }
-                    files++;
+                } else {
+                    /* Not a zip: treat the picked file as the library itself. */
+                    File out = new File(tmp, "libvulkan.so");
+                    try (java.io.FileOutputStream fo = new java.io.FileOutputStream(out)) {
+                        byte[] buf = new byte[1 << 16];
+                        int r;
+                        while ((r = in.read(buf)) > 0) fo.write(buf, 0, r);
+                    }
+                    files = 1;
                 }
             } catch (Exception ex) {
                 err = ex.toString();
             }
 
-            File lib = err == null ? findVulkanLib(tmp, 3) : null;
-            if (err == null && lib == null) err = "o ZIP não tem libvulkan.so";
+            File lib = err == null ? findDriverLib(tmp, 4) : null;
+            if (err == null && lib == null) {
+                String found = listLibs(tmp, 4);
+                err = found.isEmpty()
+                        ? "o pacote não tem libvulkan.so nem libvulkan*.so"
+                        : "o pacote não tem libvulkan.so; achei " + found;
+            }
 
             final String ferr = err;
             final File flib = lib;
@@ -1002,6 +1033,13 @@ public class UsmLauncherActivity extends Activity {
                     return;
                 }
                 File src = flib.getParentFile();
+                /* The loader opens this exact name, so a pack that shipped
+                 * libvulkan_freedreno.so gets it here too. */
+                File named = new File(src, "libvulkan.so");
+                if (!flib.equals(named) && !named.exists() && !copyFile(flib, named)) {
+                    Toast.makeText(this, "Não foi possível preparar o driver", Toast.LENGTH_LONG).show();
+                    return;
+                }
                 String name = slug(label);
                 File dst = new File(driversDir(), name);
                 for (int i = 2; dst.exists(); i++) dst = new File(driversDir(), name + "-" + i);
@@ -1018,16 +1056,62 @@ public class UsmLauncherActivity extends Activity {
         }).start();
     }
 
-    private static File findVulkanLib(File dir, int depth) {
+    /* Exact name wins; otherwise any libvulkan*.so, then any *vulkan*.so, so a
+     * Turnip build named libvulkan_freedreno.so still qualifies. */
+    private static File findDriverLib(File dir, int depth) {
+        if (dir == null || depth < 0) return null;
         File[] fs = dir.listFiles();
-        if (fs == null || depth < 0) return null;
-        for (File f : fs) if (f.isFile() && f.getName().equals("libvulkan.so")) return f;
+        if (fs == null) return null;
+        File loose = null;
+        for (File f : fs) {
+            if (!f.isFile()) continue;
+            String n = f.getName();
+            if (n.equals("libvulkan.so")) return f;
+            if (loose == null && n.startsWith("lib") && n.contains("vulkan") && n.contains(".so")) loose = f;
+        }
+        if (loose != null) return loose;
         for (File f : fs) {
             if (!f.isDirectory()) continue;
-            File r = findVulkanLib(f, depth - 1);
+            File r = findDriverLib(f, depth - 1);
             if (r != null) return r;
         }
         return null;
+    }
+
+    /* What the user actually packed, for the failure message. */
+    private static String listLibs(File dir, int depth) {
+        StringBuilder sb = new StringBuilder();
+        collectLibs(dir, depth, sb);
+        String s = sb.toString();
+        return s.length() > 120 ? s.substring(0, 117) + "..." : s;
+    }
+
+    private static void collectLibs(File dir, int depth, StringBuilder sb) {
+        if (dir == null || depth < 0 || sb.length() > 120) return;
+        File[] fs = dir.listFiles();
+        if (fs == null) return;
+        for (File f : fs) {
+            if (f.isFile() && f.getName().contains(".so")) {
+                if (sb.length() > 0) sb.append(", ");
+                sb.append(f.getName());
+            }
+        }
+        for (File f : fs) {
+            if (!f.isDirectory()) continue;
+            collectLibs(f, depth - 1, sb);
+        }
+    }
+
+    private static boolean copyFile(File from, File to) {
+        try (java.io.InputStream in = new java.io.FileInputStream(from);
+             java.io.OutputStream out = new java.io.FileOutputStream(to)) {
+            byte[] b = new byte[1 << 16];
+            int n;
+            while ((n = in.read(b)) > 0) out.write(b, 0, n);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private static boolean copyTree(File src, File dst) {
