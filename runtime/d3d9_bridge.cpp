@@ -253,6 +253,135 @@ extern "C" void bridge_scaled_mode(uint32_t i, uint32_t *w, uint32_t *h) {
  * window's aspect with the window's own size, the first entry of the list the
  * game's "Resolution Scale" menu offers, so the blit is 1:1. An in-game
  * Resolution Scale choice is already at the window's aspect and is kept. */
+
+/* ---- USM display sync ----------------------------------------------------
+ * Fixing the present parameters alone still renders the frame into a 4:3 box
+ * in the corner (and everything the game never clears outside it accumulates
+ * HUD ghosts across the swap chain images, which reads as flicker): USM
+ * builds its viewport, its menu/HUD layout and its camera projection from its
+ * own resolution globals -- three width/height pairs plus a D3DPRESENT-
+ * _PARAMETERS copy and a "windowed" flag, all parsed from pcconfig.txt --
+ * never from the back buffer. The addresses below are not hardcoded: they are
+ * located with the same byte patterns the WidescreenFix for this exact exe
+ * uses (ThirteenAG/WidescreenFixesPack, source/UltimateSpiderMan.WidescreenFix,
+ * which comments where each pattern lands on USM.exe 1.0.0.1). Whenever the
+ * game asks for a size that is not at the window's aspect, the globals are
+ * moved to the window's size first, so the game renders natively full screen
+ * from the first frame. On every presented frame the camera projection aspect
+ * (geometry_manager::PROJ_ASPECT) is then held at the window's, which keeps
+ * the world at Hor+ proportions instead of stretching it across the wider
+ * viewport; the game only rewrites that value when its own aspect setting
+ * changes, so the hold wins every normal frame. */
+#ifdef GAME_USM
+namespace usm_display {
+
+struct Vars {
+    bool tried, ok;
+    uint32_t dims[6];     /* three width/height global pairs */
+    uint32_t params;      /* the game's D3DPRESENT_PARAMETERS copy */
+    uint32_t windowed;    /* its Windowed flag */
+    uint32_t proj_aspect; /* geometry_manager::PROJ_ASPECT (a float) */
+};
+static Vars g_v;
+
+/* .text and the image, from docs/RECON.md section 2 (USM.exe 1.0.0.1). */
+const uint32_t TEXT_LO = 0x401000, TEXT_HI = 0x86F000;
+const uint32_t IMG_LO = 0x400000, IMG_HI = 0x9EA060;
+
+/* Matches a byte pattern ("A3 ?? ?? ..." -- hex pairs, ?? wildcards) over
+ * .text. Returns the number of hits and the first hit's address; the caller
+ * requires exactly one, as the reference mod does before it trusts a match. */
+static int pat_find(const char *pat, uint32_t *out) {
+    uint8_t b[64];
+    bool wild[64];
+    int n = 0;
+    for (const char *p = pat; *p && n < 64; ) {
+        if (*p == ' ') { p++; continue; }
+        if (*p == '?') { wild[n] = true; b[n] = 0; n++; p += 2; continue; }
+        int h4 = *p <= '9' ? *p - '0' : (*p | 32) - 'a' + 10;
+        int l4 = p[1] <= '9' ? p[1] - '0' : (p[1] | 32) - 'a' + 10;
+        wild[n] = false; b[n] = (uint8_t)(h4 * 16 + l4);
+        n++; p += 2;
+    }
+    int hits = 0;
+    uint32_t hit = 0;
+    for (uint32_t a = TEXT_LO; a + (uint32_t)n <= TEXT_HI; a++) {
+        const uint8_t *s = MEM + a;
+        bool m = true;
+        for (int i = 0; i < n && m; i++) m = wild[i] || s[i] == b[i];
+        if (m) { hits++; hit = a; }
+    }
+    *out = hit;
+    return hits;
+}
+
+static bool in_image(uint32_t a) { return a >= IMG_LO && a < IMG_HI; }
+
+static void scan(void) {
+    Vars &v = g_v;
+    if (v.tried) return;
+    v.tried = true;
+    uint32_t m;
+    if (pat_find("A3 ?? ?? ?? ?? FF D6 50", &m) != 1) { LOG("usm display: width pattern not unique"); return; }
+    v.dims[0] = M32(m + 1);
+    if (pat_find("DB 05 ?? ?? ?? ?? 83 C4 18 6A 00 D8 0D", &m) != 1) { LOG("usm display: height pattern not unique"); return; }
+    v.dims[1] = M32(m + 2);
+    if (pat_find("A1 ?? ?? ?? ?? 8B 0D ?? ?? ?? ?? A3 ?? ?? ?? ?? A3 ?? ?? ?? ?? A1 ?? ?? ?? ?? "
+                 "33 D2 85 C0 6A 29 0F 95 C2 6A 03 6A 00 6A 16 89 0D ?? ?? ?? ?? 89 0D ?? ?? ?? ?? 8B 0D",
+                 &m) != 1) { LOG("usm display: dimensions pattern not unique"); return; }
+    v.dims[2] = M32(m + 1);
+    v.dims[3] = M32(m + 7);
+    v.dims[4] = M32(m + 12);
+    v.params = M32(m + 17);
+    uint32_t windowed_via_dims = M32(m + 22);
+    v.dims[5] = M32(m + 43);
+    if (pat_find("C7 05 ?? ?? ?? ?? 00 00 00 00 FF 15 ?? ?? ?? ?? A1 ?? ?? ?? ?? 8B 0D ?? ?? ?? ?? 6A 04",
+                 &m) != 1) { LOG("usm display: windowed pattern not unique"); return; }
+    v.windowed = M32(m + 2);
+    if (v.windowed != windowed_via_dims) {
+        LOG("usm display: windowed flag mismatch (%08x != %08x)", v.windowed, windowed_via_dims);
+        return;
+    }
+    if (pat_find("E8 ?? ?? ?? ?? D8 3D", &m) != 1) { LOG("usm display: projection pattern not unique"); return; }
+    uint32_t target = m + 5 + (uint32_t)(int32_t)M32(m + 1);
+    v.proj_aspect = in_image(target) ? M32(target + 2) : 0;
+    bool ok = in_image(v.params) && in_image(v.windowed) && in_image(v.proj_aspect);
+    for (int i = 0; i < 6; i++) ok = ok && in_image(v.dims[i]);
+    if (!ok) { LOG("usm display: globals out of the image, sync disabled"); return; }
+    v.ok = true;
+    LOG("usm display: dims %08x %08x %08x %08x %08x %08x, params %08x, windowed %08x, proj_aspect %08x",
+        v.dims[0], v.dims[1], v.dims[2], v.dims[3], v.dims[4], v.dims[5], v.params, v.windowed, v.proj_aspect);
+}
+
+/* Move the game's own idea of the screen to w x h. */
+static void hold_aspect(void);
+static void sync_size(int w, int h) {
+    scan();
+    Vars &v = g_v;
+    if (!v.ok) return;
+    for (int i = 0; i < 6; i++) M32(v.dims[i]) = (i & 1) ? (uint32_t)h : (uint32_t)w;
+    M32(v.params + 0) = (uint32_t)w;   /* BackBufferWidth */
+    M32(v.params + 4) = (uint32_t)h;   /* BackBufferHeight */
+    M32(v.params + 32) = 1;            /* Windowed: the platform owns the window */
+    M32(v.params + 48) = 0;            /* FullScreen_RefreshRateInHz */
+    M32(v.windowed) = 1;
+    LOG("usm display: game resolution set to %dx%d", w, h);
+    hold_aspect();
+}
+
+/* Hold the camera projection at the window's aspect (Hor+), every frame. */
+static void hold_aspect(void) {
+    if (!g_v.ok || !g_v.proj_aspect) return;
+    int w = 0, h = 0;
+    platform_window_size(&w, &h);
+    if (w <= 0 || h <= 0) return;
+    float a = (float)w / (float)h;
+    if (MF32(g_v.proj_aspect) != a) MF32(g_v.proj_aspect) = a;
+}
+
+} // namespace usm_display
+#endif /* GAME_USM */
+
 static void pp_fix_size(D3DPRESENT_PARAMETERS *pp) {
     int ww = 0, wh = 0;
     platform_window_size(&ww, &wh);
@@ -269,6 +398,11 @@ static void pp_fix_size(D3DPRESENT_PARAMETERS *pp) {
         bw, bh, (unsigned)ww, (unsigned)wh);
     pp->BackBufferWidth = (uint32_t)ww;
     pp->BackBufferHeight = (uint32_t)wh;
+    /* And move the game's own resolution globals with it, or it keeps laying
+     * out and clearing for its requested size inside the bigger back buffer. */
+#ifdef GAME_USM
+    usm_display::sync_size(ww, wh);
+#endif
 }
 
 void B_IDirect3D9_GetAdapterModeCount(CPU *c) { int ww, wh; RET(mode_count(&ww, &wh), 3); }
@@ -419,6 +553,9 @@ void B_IDirect3DDevice9_Present(CPU *c) {
     g_frame++;
     g_d3d_trace = g_frame >= g_trace_from && g_frame <= g_trace_to;
     if (g_d3d_trace) fprintf(stderr, "D3D %d Present\n", g_frame);
+#ifdef GAME_USM
+    usm_display::hold_aspect();  /* camera projection at the window's aspect */
+#endif
     extern void touch_draw(IDirect3DDevice9 *d);
     touch_draw(d);
     HRESULT hr = d->Present((const RECT *)GPTR(ARG(1)), (const RECT *)GPTR(ARG(2)), nullptr,
