@@ -4,4 +4,14 @@
     <style name="AppTheme" parent="android:Theme.NoTitleBar.Fullscreen">
         <!-- Customize your theme here. -->
     </style>
+
+    <!-- Launcher: same black as the screen's gradient, so there is no white
+         flash between the icon tap and the first frame. -->
+    <style name="LauncherTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/launcher_bg</item>
+        <item name="android:statusBarColor">@color/launcher_bg</item>
+        <item name="android:navigationBarColor">@color/launcher_bg</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
 </resources>
