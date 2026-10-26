@@ -24,6 +24,7 @@ static const struct { const char *key, *file; } k_art[] = {
     {"black", "hud_black.png"},         {"on/black", "on/hud_black_on.png"},
     {"pause", "hud_pause.png"},         {"on/pause", "on/hud_pause_on.png"},
     {"back", "hud_back.png"},           {"on/back", "on/hud_back_on.png"},
+    {"mash", "hud_mash.png"},           /* the struggle/QTE button */
     {"stick", "hud_stick.png"},         {"knob", "hud_stick_knob.png"},
     {"campad", "hud_campad.png"},       {"cursor", "hud_cursor.png"},
     {"skip", "hud_skip.png"},

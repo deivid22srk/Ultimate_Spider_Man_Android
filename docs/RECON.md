@@ -367,7 +367,13 @@ is confirmed from `port/log.txt`.
 Context-dependent behaviour implemented so far, and no more: the camera-zone
 hint (`hud_campad`) is drawn only while a finger is dragging in the camera
 zone, and the pointer art (`hud_cursor`) only for 1.5 s after a pointer
-gesture. Swapping the whole HUD by game state (menus vs gameplay vs cutscene)
+gesture.
+
+The struggle button (`hud_mash.png`, always on screen, never hidden by the
+contextual HUD) alternates ThrowWeb and Jump every 70 ms while it is held. The
+game's grab QTEs — Venom absorbing you is the one that shows up most — want
+exactly that pair pressed in rapid alternation, which two buttons tapped by hand
+cannot reproduce reliably; the touch layer presses them for the player. Swapping the whole HUD by game state (menus vs gameplay vs cutscene)
 is **not** implemented — none of the signals it needs (the front-end level
 pointer, Bink playback, a meaningful `ClipCursor`/`ShowCursor` change) is
 wired up yet.
