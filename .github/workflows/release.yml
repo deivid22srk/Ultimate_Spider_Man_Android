@@ -1,0 +1,187 @@
+name: release
+
+# Builds a signed release APK and publishes it to this repository's releases.
+#
+# Same two modes as build.yml, chosen by the GEN_REPO variable:
+#
+#   full      GEN_REPO set: gen.tar.zst is fetched from that private repository
+#             (GEN_TOKEN) and the APK contains the recompiled game code.
+#   app-only  GEN_REPO unset: builds against ci/gen_stub. Installs, but Play
+#             stops with a message, because there is no game code in it.
+#
+# Signing is fixed on purpose: android/keystore/usm-release.p12 is the same key
+# for every release, so a new APK installs straight over the previous one
+# instead of demanding an uninstall. The step after the build verifies that the
+# certificate digest is the expected one, so a changed or regenerated keystore
+# fails the run instead of quietly shipping an APK nobody can update.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (the tag becomes v<version>)"
+        required: true
+        default: "1.0.0"
+      prerelease:
+        description: "Mark as a pre-release"
+        type: boolean
+        default: false
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  USM_KEYSTORE: ${{ github.workspace }}/android/keystore/usm-release.p12
+  USM_KEYSTORE_TYPE: PKCS12
+  USM_STORE_PASSWORD: usm-release-2005
+  USM_KEY_ALIAS: usm
+  USM_KEY_PASSWORD: usm-release-2005
+  # SHA-256 of the release certificate. Update it only if the key is replaced on
+  # purpose; every APK before that point then stops being an update target.
+  USM_CERT_SHA256: "7537f4a31a3159328bf08b6da07ed56b8991ed58674567a6af9216594f19693d1f"
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: >-
+            platforms;android-34
+            build-tools;34.0.0
+            cmake;3.22.1
+            ndk;27.2.12479018
+
+      - name: Toolchain versions
+        run: |
+          java -version
+          cmake --version | head -1
+
+      - name: Fetch recompiled game code (private repository)
+        if: ${{ vars.GEN_REPO != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GEN_TOKEN }}
+          GEN_REPO: ${{ vars.GEN_REPO }}
+          GEN_TAG: ${{ vars.GEN_TAG }}
+        run: |
+          set -euo pipefail
+          test -n "${GH_TOKEN:-}" || { echo "GEN_TOKEN secret is missing"; exit 1; }
+          gh release download "$GEN_TAG" --repo "$GEN_REPO" \
+            --pattern 'gen.tar.zst' --output gen.tar.zst --clobber
+          rm -rf gen && mkdir gen
+          tar -I zstd -xf gen.tar.zst -C .
+          rm -f gen.tar.zst
+          echo "recompiled files: $(ls gen/*.c | wc -l)"
+
+      - name: Use stub tables when gen/ is absent
+        run: |
+          if [ -z "$(ls -A gen 2>/dev/null)" ]; then
+            mkdir -p gen
+            cp ci/gen_stub/* gen/
+            echo "USM_BUILD_MODE=app-only" >> "$GITHUB_ENV"
+            echo "gen/ absent: this release will be app-only"
+          else
+            echo "USM_BUILD_MODE=full" >> "$GITHUB_ENV"
+            echo "gen/ present: full build ($(ls gen/*.c | wc -l) C files)"
+          fi
+
+      - name: Resolve version
+        id: v
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            v="${GITHUB_REF_NAME#v}"
+          else
+            v="${{ inputs.version }}"
+          fi
+          echo "name=$v" >> "$GITHUB_OUTPUT"
+          echo "releasing v$v (versionCode ${GITHUB_RUN_NUMBER})"
+
+      - name: Build signed release APK
+        working-directory: android
+        env:
+          LB_GEN_JOBS: "2"
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleRelease \
+            -PndkVersion=27.2.12479018 \
+            -PlbGenJobs="${LB_GEN_JOBS}" \
+            -PusmVersionName="${{ steps.v.outputs.name }}" \
+            -PusmVersionCode="${GITHUB_RUN_NUMBER}"
+
+      - name: Verify the signature is the fixed one
+        run: |
+          set -euo pipefail
+          apk=android/app/build/outputs/apk/release/app-release.apk
+          test -f "$apk" || { echo "no release APK"; exit 1; }
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --print-certs "$apk" \
+            | tee certs.txt
+          got=$(grep -o 'certificate SHA-256 digest: [0-9a-f]*' certs.txt | head -1 | cut -d' ' -f4)
+          if [ "$got" != "$USM_CERT_SHA256" ]; then
+            echo "signing key changed: expected $USM_CERT_SHA256, got $got"
+            echo "an APK with a different key cannot install over the published one"
+            exit 1
+          fi
+          echo "signed with the fixed key ($got)"
+
+      - name: Collect artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          cp android/app/build/outputs/apk/release/app-release.apk out/UltimateSpiderMan-${{ steps.v.outputs.name }}.apk
+          cd out
+          sha256sum ./*.apk | sed 's| \./| |' | tee SHA256SUMS.txt
+          ls -l
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="v${{ steps.v.outputs.name }}"
+          sha="$(cut -d' ' -f1 out/SHA256SUMS.txt)"
+          mode="${USM_BUILD_MODE:-full} build"
+          flag="--latest"
+          if [ "${{ inputs.prerelease }}" = "true" ]; then flag="--prerelease"; fi
+          {
+            echo "Port Android do Ultimate Spider-Man (PC, 2005): runtime próprio,"
+            echo "launcher com configurações e HUD de toque."
+            echo ""
+            echo "**Instalação**"
+            echo "- arm64, Android 9 ou superior"
+            echo "- o APK não traz os arquivos do jogo: aponte o launcher para a sua cópia"
+            echo "- assinatura fixa: instala por cima da versão anterior, sem desinstalar"
+            echo ""
+            echo "**sha256**"
+            echo "$sha"
+            echo ""
+            echo "Build: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} ($mode)"
+          } > notes.md
+          gh release create "$tag" out/*.apk out/SHA256SUMS.txt \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Ultimate Spider-Man Android $tag" \
+            --notes-file notes.md $flag
+          echo "published ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/$tag"
+
+      - name: Summary
+        run: |
+          {
+            echo "### Release v${{ steps.v.outputs.name }}"
+            echo ""
+            echo "https://github.com/${GITHUB_REPOSITORY}/releases/tag/v${{ steps.v.outputs.name }}"
+            echo ""
+            echo "signed with the fixed key, sha256: \`$(cut -d' ' -f1 out/SHA256SUMS.txt)\`"
+          } >> "$GITHUB_STEP_SUMMARY"

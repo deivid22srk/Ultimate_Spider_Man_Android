@@ -1,5 +1,15 @@
 apply plugin: 'com.android.application'
 
+/* Release signing. The keystore is fixed (android/keystore/usm-release.p12) so
+ * every published APK carries the same certificate and installs over the
+ * previous one. The workflow can override it with the KEYSTORE_BASE64 secret if
+ * those are ever configured, without touching this file. */
+def usmKeystore = System.getenv("USM_KEYSTORE") ?: project.findProperty("usmKeystore")
+def usmStoreType = System.getenv("USM_KEYSTORE_TYPE") ?: "PKCS12"
+def usmStorePass = System.getenv("USM_STORE_PASSWORD") ?: project.findProperty("usmStorePassword")
+def usmKeyAlias = System.getenv("USM_KEY_ALIAS") ?: project.findProperty("usmKeyAlias")
+def usmKeyPass = System.getenv("USM_KEY_PASSWORD") ?: project.findProperty("usmKeyPassword")
+
 android {
     namespace "com.deivid22srk.usm"
     compileSdkVersion 34
@@ -8,13 +18,24 @@ android {
         applicationId "com.deivid22srk.usm"
         minSdkVersion 28
         targetSdkVersion 29  // legacy storage: plain file access with the normal storage prompt
-        versionCode 1
-        versionName "0.1"
+        versionCode project.hasProperty('usmVersionCode') ? project.property('usmVersionCode').toInteger() : 1
+        versionName project.hasProperty('usmVersionName') ? project.property('usmVersionName') : "0.1"
         externalNativeBuild {
             cmake {
                 arguments "-DANDROID_STL=c++_shared", "-DANDROID_PLATFORM=android-28",
                         "-DLB_GEN_JOBS=" + (project.findProperty('lbGenJobs') ?: '3')
                 abiFilters 'arm64-v8a'
+            }
+        }
+    }
+    signingConfigs {
+        if (usmKeystore) {
+            release {
+                storeFile file(usmKeystore)
+                storeType usmStoreType
+                storePassword usmStorePass
+                keyAlias usmKeyAlias
+                keyPassword usmKeyPass
             }
         }
     }
@@ -27,7 +48,9 @@ android {
         }
         release {
             minifyEnabled false
-            signingConfig signingConfigs.debug
+            // The fixed release key when one is configured, the throwaway debug
+            // key otherwise (local builds only: CI always passes a keystore).
+            signingConfig usmKeystore ? signingConfigs.release : signingConfigs.debug
         }
     }
     externalNativeBuild {
