@@ -143,6 +143,7 @@ static int connected(uint32_t i) { return i == 0 || (i < 4 && g_pads[i]); }
  * BackButton=M) and the right stick moves the mouse for the camera. */
 static const struct { uint16_t bit; uint8_t dik, vk; } k_usm_keys[] = {
     {0x1000, 0x39, 0x20}, /* A -> Space: jump */
+    {0x1000, 0x1C, 0x0D}, /* A -> Enter: confirm in menus (New game, etc.) */
     {0x2000, 0x2E, 0x43}, /* B -> C: throw web */
     {0x4000, 0x10, 0x51}, /* X -> Q: punch */
     {0x8000, 0x12, 0x45}, /* Y -> E: kick */

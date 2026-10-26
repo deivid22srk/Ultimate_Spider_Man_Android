@@ -455,55 +455,39 @@ void touch_draw(IDirect3DDevice9 *d) {
 
     if (!g_art_tried) load_atlas(d);
 
-    /* Two batches: the plain discs (sampler from the soft-edged texture) and
-     * the artist's icons (from the atlas). Each is one DrawPrimitiveUP. */
-    Vtx vd[6 * (NB + 4)], va[6 * (ART_MAX + 8)];
-    int nd = 0, na = 0;
+    /* Plain discs only: no artist icons, so nothing is drawn twice. */
+    Vtx vd[6 * (NB + 6)];   /* stick, knob, NB buttons, camera hint, 2 cursor discs */
+    int nd = 0;
     float sx, sy;
     stick_pos(&sx, &sy);
-    const ArtEntry *a;
-    if ((a = art("stick"))) art_quad(va + 6 * na++, a, sx, sy, STICK_R * 1.05f, w, h, dim(0xFFFFFFFF));
-    else quad(vd + 6 * nd++, sx, sy, STICK_R, w, h, dim(0x90FFFFFF));
+    quad(vd + 6 * nd++, sx, sy, STICK_R, w, h, dim(0x90FFFFFF));
     float kx = sx + g_stick_x * STICK_R / g_aspect, ky = sy + g_stick_y * STICK_R;
-    if ((a = art("knob"))) art_quad(va + 6 * na++, a, kx, ky, STICK_R * 0.47f, w, h, dim(0xFFFFFFFF));
-    else quad(vd + 6 * nd++, kx, ky, STICK_R * 0.45f, w, h, dim(0xD0FFFFFF));
+    quad(vd + 6 * nd++, kx, ky, STICK_R * 0.45f, w, h, dim(0xD0FFFFFF));
     for (int i = 0; i < NB; i++) {
         float bx, by;
         button_pos(k_buttons[i], &bx, &by);
         bool on = (g_buttons & k_buttons[i].bit) != 0;
-        char key[32];
-        snprintf(key, sizeof key, "on/%s", k_button_icon[i]);
-        const ArtEntry *b = art(on ? key : k_button_icon[i]);
-        if (b) art_quad(va + 6 * na++, b, bx, by, k_buttons[i].r * 1.06f, w, h, dim(on ? 0xFFFFFFFF : 0xE0FFFFFF));
-        else quad(vd + 6 * nd++, bx, by, k_buttons[i].r, w, h, dim((k_buttons[i].color & 0xFFFFFF) | (on ? 0xF0u : 0x90u) << 24));
+        quad(vd + 6 * nd++, bx, by, k_buttons[i].r, w, h,
+             dim((k_buttons[i].color & 0xFFFFFF) | (on ? 0xF0u : 0x90u) << 24));
     }
 #ifdef GAME_USM
-    /* Camera zone hint: only while the finger is dragging there, so nothing
-     * permanent sits in the middle of the screen. */
+    /* Camera zone hint: only while the finger is dragging there. */
     uint32_t lookage = SDL_GetTicks() - g_look_ms;
-    if ((a = art("campad")) && g_look_ms && lookage < 900)
-        art_quad(va + 6 * na++, a, CAMPAD_X, CAMPAD_Y, CAMPAD_R, w, h,
-                 dim((uint32_t)((900 - lookage) * 0xB0 / 900) << 24 | 0xFFFFFF));
-    /* Where the finger last landed: the menus are clicked through the virtual
-     * system cursor, so this is where that cursor now is (the game's own
-     * pointer, when it draws one, sits at the same spot). */
+    if (g_look_ms && lookage < 900) {
+        quad(vd + 6 * nd++, CAMPAD_X, CAMPAD_Y, CAMPAD_R, w, h,
+             dim((uint32_t)((900 - lookage) * 0x50 / 900) << 24 | 0xFFFFFF));
+    }
+    /* Virtual cursor at the last pointer touch (the menus are clicked with it). */
     uint32_t age = SDL_GetTicks() - g_ptr_ms;
     if (g_ptr_ms && age < 1500) {
         uint32_t al = (uint32_t)((1500 - age) * 0xFF / 1500);
-        if ((a = art("cursor"))) cursor_quad(va + 6 * na++, a, g_ptr_x, g_ptr_y, 0.055f, w, h, dim(al << 24 | 0xFFFFFF));
-        else {
-            quad(vd + 6 * nd++, g_ptr_x, g_ptr_y, 0.032f, w, h, dim(0xFFFFFF | (al * 0xC0 / 0xFF) << 24));
-            quad(vd + 6 * nd++, g_ptr_x, g_ptr_y, 0.013f, w, h, dim(0xFFFFFF | (al * 0xC0 / 0xFF) << 24));
-        }
+        quad(vd + 6 * nd++, g_ptr_x, g_ptr_y, 0.032f, w, h, dim(0xFFFFFF | (al * 0xC0 / 0xFF) << 24));
+        quad(vd + 6 * nd++, g_ptr_x, g_ptr_y, 0.013f, w, h, dim(0xFFFFFF | (al * 0xC0 / 0xFF) << 24));
     }
 #endif
     if (nd) {
         d->SetTexture(0, g_tex);
         d->DrawPrimitiveUP(D3DPT_TRIANGLELIST, 2 * nd, vd, sizeof(Vtx));
-    }
-    if (na && g_atlas) {
-        d->SetTexture(0, g_atlas);
-        d->DrawPrimitiveUP(D3DPT_TRIANGLELIST, 2 * na, va, sizeof(Vtx));
     }
     d->EndScene();
     d->SetRenderTarget(0, old);
