@@ -28,6 +28,15 @@ extern int g_d3d_trace, g_bisect;
 bool d3d_skip_draw(void);
 void d3d_trace(CPU *c, const char *name, int nargs);
 
+// Guest draw calls per frame, counted on the D3D9 thunks and published at
+// Present. The touch overlay uses it to tell a menu frame (a few dozen
+// primitives) from a frame of the world (hundreds). Draws this overlay makes
+// itself go straight to the host device object, so they are never counted.
+extern "C" {
+void d3d9_count_draw(void);
+uint32_t d3d9_last_frame_draws(void);
+}
+
 extern "C" {
 void *platform_window(void);
 void platform_present_hook(void);

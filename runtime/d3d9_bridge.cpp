@@ -546,8 +546,22 @@ static void bisect_present(void) {
     g_bisect = g_frame >= g_bisect_from && g_frame < g_bisect_from + 160;
 }
 
+/* Draw calls per frame. Counted on the guest's Draw* thunks (see
+ * tools/gen_d3d9_bridge.py) and published at Present, which is where the touch
+ * overlay reads it: a menu composes a few dozen primitives, a frame of the
+ * world draws hundreds, so the ratio is the only "which screen" signal this
+ * port has without touching game internals. */
+static volatile uint32_t g_frame_draws, g_last_frame_draws;
+extern "C" void d3d9_count_draw(void) { __atomic_add_fetch(&g_frame_draws, 1, __ATOMIC_RELAXED); }
+extern "C" uint32_t d3d9_last_frame_draws(void) { return __atomic_load_n(&g_last_frame_draws, __ATOMIC_RELAXED); }
+static void d3d9_frame_begin(void) {
+    __atomic_store_n(&g_last_frame_draws, __atomic_load_n(&g_frame_draws, __ATOMIC_RELAXED), __ATOMIC_RELAXED);
+    __atomic_store_n(&g_frame_draws, 0, __ATOMIC_RELAXED);
+}
+
 void B_IDirect3DDevice9_Present(CPU *c) {
     auto *d = (IDirect3DDevice9 *)com_host(ARG(0));
+    d3d9_frame_begin();  /* publish the frame's draw total before the overlay reads it */
     if (g_trace_from < 0) {
         const char *e = getenv("LB_D3DTRACE");
         g_trace_from = 1 << 30;

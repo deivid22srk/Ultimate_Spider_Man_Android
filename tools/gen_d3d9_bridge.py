@@ -153,6 +153,7 @@ def gen():
             o.append("    if (g_d3d_trace) d3d_trace(c, \"%s::%s\", %d);" % (iface, name, len(args)))
             if name.startswith("Draw") and not name.endswith("Patch"):
                 o.append("    if (g_bisect && d3d_skip_draw()) { RET(0, %d); return; }" % (len(args) + 1))
+                o.append("    d3d9_count_draw();  /* per-frame draw total, see d3d9_bridge.cpp */")
             call = []
             post = []
             for k, a in enumerate(args):

@@ -114,23 +114,30 @@ void stick_pos(float *x, float *y) {
 bool g_hud_ctx;
 bool g_hud_menu_last;
 
-// Menu = the game is showing its cursor (ShowCursor count >= 0 while it
-// drives menus with the system cursor). Only used when g_hud_ctx is on.
-extern "C" int user32_cursor_visible(void);
-extern "C" unsigned user32_cursor_reads(void);
+extern "C" uint32_t d3d9_last_frame_draws(void);
+
+// Menu = the game is not drawing the world. Measured, not inferred: USM's
+// front end never calls GetCursorPos (0 calls in a whole session on device,
+// see docs/RECON.md) and never moves the ShowCursor counter, so the two
+// "obvious" signals the port used to poll were dead on this game -- the
+// overlay sat in "game" forever and the contextual HUD never appeared.
+// What does differ is the frame the guest composes: a menu is a few dozen
+// primitives, a frame of the world is hundreds. So count the guest's draw
+// calls per frame in the D3D9 bridge and switch on the ratio, with enough
+// hysteresis that one light frame (a fade, a HUD-only pass) cannot flip it.
+#ifndef HUD_MENU_DRAWS
+#define HUD_MENU_DRAWS 32   /* below this many draws a frame looks like a menu */
+#endif
 bool hud_menu() {
 #ifdef GAME_USM
-    /* The front end polls GetCursorPos to hit-test its widgets; gameplay
-     * reads the mouse device's relative axes instead. A rising read count
-     * therefore means the game is in a menu. Sticky 1.2 s so gaps between
-     * polls don't flip the overlay back and forth. */
-    static uint32_t last_reads, menu_until;
-    uint32_t now = SDL_GetTicks(), r = user32_cursor_reads();
-    if (r != last_reads) { last_reads = r; menu_until = now + 1200; }
-    bool m = now < menu_until || user32_cursor_visible() != 0;
+    static int low, high;
+    uint32_t d = d3d9_last_frame_draws();
+    if (d < HUD_MENU_DRAWS) { if (low < 21) low++; high = 0; }
+    else { low = 0; if (high < 3) high++; }
+    bool m = g_hud_menu_last ? high < 2 : low >= 20;
     if (m != g_hud_menu_last) {
         g_hud_menu_last = m;
-        LOG("touch: HUD context -> %s (cursor reads %u)", m ? "menu" : "game", r);
+        LOG("touch: HUD context -> %s (%u draws in the frame)", m ? "menu" : "game", d);
     }
     return m;
 #else
@@ -140,19 +147,26 @@ bool hud_menu() {
 
 #ifdef GAME_USM
 extern "C" int user32_cursor_count(void);
-/* Diagnostic while the contextual HUD is on: dump the candidate "which screen"
- * signals once a second, so a log taken in a menu and one taken in gameplay
- * can be compared and a real discriminator picked. */
+extern "C" unsigned user32_cursor_reads(void);
+/* Calibration for the draw-count threshold: once a second, while the
+ * contextual HUD is on, print the min..max draw count of the last second
+ * together with the state the overlay settled on. One minute in a menu and
+ * one in the world is enough to see the gap, and to confirm the switch fired. */
 void hud_probe() {
-    static uint32_t last;
+    static uint32_t last, lo = ~0u, hi;
+    uint32_t d = d3d9_last_frame_draws();
+    if (d < lo) lo = d;
+    if (d > hi) hi = d;
     uint32_t now = SDL_GetTicks();
     if (now - last < 1000) return;
     last = now;
     uint32_t w = M32(0x960894), lv = w >= 0x10000 ? M32(w + 0x12C) : 0;
     if (lv < 0x10000) lv = M32(0xACA89C);
     unsigned flags = lv >= 0x10000 ? M8(lv + 0x64) : 0;
-    LOG("touch: probe world=%08x level=%08x flags=%02x cursorshow=%d cursorreads=%u",
-        w, lv, flags, user32_cursor_count(), user32_cursor_reads());
+    LOG("touch: probe draws %u..%u cursorshow=%d cursorreads=%u world=%08x level=%08x flags=%02x ctx=%s",
+        lo, hi, user32_cursor_count(), user32_cursor_reads(), w, lv, flags,
+        g_hud_menu_last ? "menu" : "game");
+    lo = ~0u; hi = 0;
 }
 #endif
 
