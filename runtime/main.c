@@ -441,9 +441,26 @@ int main(int argc, char **argv) {
             mkdir(base, 0777);
             mkdir(g_save_dir, 0777);
             snprintf(logp, sizeof logp, "%s/log.txt", base);
-            if (freopen(logp, "w", stderr)) setvbuf(stderr, NULL, _IOLBF, 0);
-            if (!env) g_log_level = 1;
+            if (!env) {
+                /* log level from save/touch.cfg (4th field); default 1 */
+                char cfgp[1100];
+                snprintf(cfgp, sizeof cfgp, "%s/touch.cfg", g_save_dir);
+                int lvl = 1;
+                if (FILE *cf = fopen(cfgp, "r")) {
+                    int t, nn, k, l;
+                    if (fscanf(cf, "%d %d %d %d", &t, &nn, &k, &l) == 4) lvl = l;
+                    fclose(cf);
+                }
+                g_log_level = lvl;
+            }
+            if (g_log_level > 0 && freopen(logp, "w", stderr)) setvbuf(stderr, NULL, _IOLBF, 0);
+            else if (g_log_level == 0) {
+                /* logs fully off: send stderr to nowhere (a fresh log.txt is still removed) */
+                unlink(logp);
+                freopen("/dev/null", "w", stderr);
+            }
         }
+
         argc = 1;  /* consumed */
     }
 #endif

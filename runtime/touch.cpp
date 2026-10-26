@@ -504,9 +504,11 @@ static std::string cfg_path() { return std::string(g_save_dir) + "/touch.cfg"; }
 static bool g_nintendo, g_skip_cutscenes;
 extern "C" void input_set_nintendo(int on);
 extern "C" void input_set_skip_cutscenes(int on);
+extern "C" int g_log_level;
 static void save_cfg() {
     if (FILE *f = fopen(cfg_path().c_str(), "w")) {
-        fprintf(f, "%d %d %d\n", g_touch_on, g_nintendo, g_skip_cutscenes);
+        /* 4th field: log level (0 off, 1 normal, 2 debug); read in main() */
+        fprintf(f, "%d %d %d %d\n", g_touch_on, g_nintendo, g_skip_cutscenes, g_log_level);
         fclose(f);
     }
 }

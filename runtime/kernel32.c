@@ -738,7 +738,7 @@ SHIM(CreateFileA) {
             if (++s_cache_misses % 500 == 1)
                 LOG("shader cache: %u not cached yet (e.g. %s)", s_cache_misses, strrchr(host, '/') + 1);
         } else
-            LOG("CreateFileA failed: %s (%s): errno %d %s", name, host, errno, strerror(errno));
+            TRACE("CreateFileA failed: %s (%s): errno %d %s", name, host, errno, strerror(errno));
         rt_set_last_error(c, errno == ENOENT ? ERROR_FILE_NOT_FOUND : ERROR_ACCESS_DENIED);
         RET(INVALID_HANDLE, 7);
     }

@@ -36,6 +36,9 @@ static void on_prof(int sig, siginfo_t *si, void *uc_) {
 
 void prof_start(void) {
     extern char g_save_dir[];
+    extern int g_log_level;
+    /* Off unless debug logging is on: the 1 kHz SIGPROF timer costs frames. */
+    if (g_log_level < 2) return;
     char path[1100];
     snprintf(path, sizeof path, "%s/noprof.txt", g_save_dir);
     if (access(path, F_OK) == 0) return;

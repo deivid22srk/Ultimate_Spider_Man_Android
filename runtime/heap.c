@@ -151,14 +151,14 @@ void usm_map_watch_note(const char *op, uint32_t req, uint32_t ptr) {
         }
         n = M32(n);
     }
-    if (req == 16 && op[0] == 'm' && on_guest_stack(rt_current_cpu(), 0x5095F6u)) {
+    if (req == 16 && op[0] == 'm' && on_guest_stack(rt_current_cpu(), 0x5095F6u) && g_log_level > 1) {
         static int nins;
         fprintf(stderr, "usm: map insert #%d node=%08x size=%u mask=%x walk=%d\n",
                 ++nins, ptr, size, mask, i);
     }
     if ((uint32_t)i != size) {
         g_map_soft++;
-        if (g_map_soft < 4)
+        if (g_map_soft < 4 && g_log_level > 1)
             fprintf(stderr, "usm: map soft mismatch: walk %d != size %u after %s(%08x)\n",
                     i, size, op, ptr);
     }
