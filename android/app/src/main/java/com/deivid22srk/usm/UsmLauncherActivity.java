@@ -2,6 +2,7 @@ package com.deivid22srk.usm;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -106,6 +107,7 @@ public class UsmLauncherActivity extends Activity {
         else logLevel = prefs.getBoolean("logoff", false) ? 0 : prefs.getBoolean("debuglog", false) ? 2 : 1;
         buildUi();
         refreshFolder();
+        checkDriverCrash();
     }
 
     /* Full screen, but the system bars stay usable: the content is padded by
@@ -1040,6 +1042,7 @@ public class UsmLauncherActivity extends Activity {
                     Toast.makeText(this, "Não foi possível preparar o driver", Toast.LENGTH_LONG).show();
                     return;
                 }
+                boolean fixedStack = normalizeExecStack(named);
                 String name = slug(label);
                 File dst = new File(driversDir(), name);
                 for (int i = 2; dst.exists(); i++) dst = new File(driversDir(), name + "-" + i);
@@ -1051,9 +1054,42 @@ public class UsmLauncherActivity extends Activity {
                 prefs.edit().putString("driver", dst.getName()).apply();
                 refreshDrivers();
                 Toast.makeText(this, "Driver " + dst.getName() + " importado (" + nfiles
-                        + " arquivos). Vale no próximo JOGAR.", Toast.LENGTH_LONG).show();
+                        + " arquivos" + (fixedStack ? ", pilha executável corrigida" : "")
+                        + "). Vale no próximo JOGAR.", Toast.LENGTH_LONG).show();
             });
         }).start();
+    }
+
+    /* Android refuses an executable stack for apps targeting API 29+, and the
+     * refusal shows up as "avc: denied { execstack }" while the driver is being
+     * loaded. Some Adreno/Turnip builds still carry PF_X on PT_GNU_STACK even
+     * though nothing runs from the stack, so the flag is cleared here. Returns
+     * true when the file was changed. */
+    private static boolean normalizeExecStack(File f) {
+        try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(f, "rw")) {
+            byte[] h = new byte[64];
+            raf.readFully(h);
+            if (h[0] != 0x7f || h[1] != 'E' || h[2] != 'L' || h[3] != 'F' || h[4] != 2) return false;
+            java.nio.ByteBuffer hb = java.nio.ByteBuffer.wrap(h).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+            long phoff = hb.getLong(32);
+            int phentsize = hb.getShort(54) & 0xffff;
+            int phnum = hb.getShort(56) & 0xffff;
+            byte[] ph = new byte[phentsize];
+            for (int i = 0; i < phnum; i++) {
+                raf.seek(phoff + (long) i * phentsize);
+                raf.readFully(ph);
+                java.nio.ByteBuffer pb = java.nio.ByteBuffer.wrap(ph).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+                if (pb.getInt(0) != 0x6474e551) continue;          // PT_GNU_STACK
+                int flags = pb.getInt(4);
+                if ((flags & 1) == 0) return false;                // already RW
+                raf.seek(phoff + (long) i * phentsize + 4);
+                raf.write(java.nio.ByteBuffer.allocate(4)
+                        .order(java.nio.ByteOrder.LITTLE_ENDIAN).putInt(flags & ~1).array());
+                return true;
+            }
+        } catch (Exception ignored) {
+        }
+        return false;
     }
 
     /* Exact name wins; otherwise any libvulkan*.so, then any *vulkan*.so, so a
@@ -1146,6 +1182,49 @@ public class UsmLauncherActivity extends Activity {
         refreshDrivers();
     }
 
+    /* A driver that crashes the game must not leave the app unusable: the run
+     * that used one is timestamped, and if the process died of a native crash
+     * after that, the launcher offers to drop the driver. The exit history is
+     * asked of the framework here -- ActivityManager only reports this
+     * package's own processes, and only from API 30 on. */
+    private void checkDriverCrash() {
+        final String pending = prefs.getString("pendingDriver", "");
+        final long since = prefs.getLong("pendingDriverAt", 0L);
+        prefs.edit().remove("pendingDriver").remove("pendingDriverAt").apply();
+        if (pending == null || pending.isEmpty() || Build.VERSION.SDK_INT < 30) return;
+
+        String reason = null;
+        try {
+            android.app.ActivityManager am =
+                    (android.app.ActivityManager) getSystemService(ACTIVITY_SERVICE);
+            java.util.List<android.app.ApplicationExitInfo> l =
+                    am.getHistoricalProcessExitReasons(getPackageName(), 0, 5);
+            for (android.app.ApplicationExitInfo e : l) {
+                if (e.getTimestamp() < since) continue;
+                int r = e.getReason();
+                if (r == android.app.ApplicationExitInfo.REASON_CRASH_NATIVE) reason = "falha nativa";
+                else if (r == android.app.ApplicationExitInfo.REASON_SIGNALED) reason = "sinal recebido";
+                else if (r == android.app.ApplicationExitInfo.REASON_LOW_MEMORY) reason = "memória insuficiente";
+                if (reason != null) break;
+            }
+        } catch (Exception ignored) {
+        }
+        if (reason == null) return;
+
+        final String name = new File(pending).getName();
+        new AlertDialog.Builder(this)
+                .setTitle("O jogo fechou com o driver " + name)
+                .setMessage("A execução anterior terminou em " + reason + " logo depois de abrir "
+                        + "com esse driver.\n\nVoltar para o driver da GPU do aparelho? O jogo "
+                        + "abre normalmente, só sem o driver importado.")
+                .setPositiveButton("Usar o do sistema", (d, w) -> {
+                    prefs.edit().putString("driver", "system").apply();
+                    refreshDrivers();
+                })
+                .setNegativeButton("Manter", null)
+                .show();
+    }
+
     private void play() {
         if (!hasStorage()) { pendingPlay = true; requestStorage(); return; }
         if (!checkFolder(prefs.getString("folder", null)).isEmpty()) { showScreen(false); refreshFolder(); return; }
@@ -1184,9 +1263,15 @@ public class UsmLauncherActivity extends Activity {
             folderStatus.setTextColor(AMBER);
             return;
         }
+        String drv = driverPath();
+        /* Recorded so the next launch can tell the user that the run which
+         * never came back was started with a custom driver, and offer to drop
+         * it. Cleared by checkDriverCrash() as soon as it is used. */
+        prefs.edit().putString("pendingDriver", drv)
+                .putLong("pendingDriverAt", System.currentTimeMillis()).apply();
         Intent i = new Intent(this, UsmActivity.class);
         i.putExtra("game", folder);
-        i.putExtra("driver", driverPath());
+        i.putExtra("driver", drv);
         startActivity(i);
         finish();
     }
