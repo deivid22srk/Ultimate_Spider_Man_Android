@@ -64,13 +64,19 @@ int art_load(const char *const *dirs, int ndirs, ArtEntry *out, int max, uint8_t
         int iw = 0, ih = 0;
         uint8_t *px = read_png(dirs, ndirs, k_art[i].file, &iw, &ih, NULL);
         if (!px) continue;
-        uint8_t *dst = buf + (size_t)n * cell;
+        /* Cell (col,row) of the sheet, not the n-th contiguous 256K block: the
+         * UVs below describe a grid, so the pixels have to land on it. Writing
+         * them back to back left every cell holding slices of four neighbouring
+         * icons, which is what put two actions (plain and pressed art) inside
+         * one button on device. */
+        const int col = n % ART_COLS, row = n / ART_COLS;
+        uint8_t *dst = buf + ((size_t)row * ART_CELL * ART_W + (size_t)col * ART_CELL) * 4;
         for (int y = 0; y < ART_CELL; y++) {
             int sy = ih == ART_CELL ? y : (int)((int64_t)y * ih / ART_CELL);
             for (int x = 0; x < ART_CELL; x++) {
                 int sx = iw == ART_CELL ? x : (int)((int64_t)x * iw / ART_CELL);
                 const uint8_t *s = px + ((size_t)sy * iw + sx) * 4;
-                uint8_t *o = dst + ((size_t)y * ART_CELL + x) * 4;
+                uint8_t *o = dst + ((size_t)y * ART_W + x) * 4;
                 o[0] = s[2];
                 o[1] = s[1];
                 o[2] = s[0];
@@ -80,7 +86,6 @@ int art_load(const char *const *dirs, int ndirs, ArtEntry *out, int max, uint8_t
         free(px);
         ArtEntry *e = &out[n];
         snprintf(e->key, sizeof e->key, "%s", k_art[i].key);
-        int col = n % ART_COLS, row = n / ART_COLS;
         e->u0 = (float)(col * ART_CELL) / ART_W;
         e->v0 = (float)(row * ART_CELL) / ART_H;
         e->u1 = (float)((col + 1) * ART_CELL) / ART_W;

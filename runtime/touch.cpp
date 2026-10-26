@@ -352,9 +352,15 @@ void make_texture(IDirect3DDevice9 *d) {
     g_tex->UnlockRect(0);
 }
 
+/* A r is a half-size in screen-height units, and it must come out square in
+ * pixels on both axes. Scaling x by r/g_aspect*w only does that when the back
+ * buffer has the window's aspect; it does not (2285x1080 buffer, 2400x1080
+ * presented), and the mismatch squashed every button -- the discs by 5%, the
+ * icons by whatever the atlas rect added on top. Sizes are pixels now. */
 void quad(Vtx *v, float cx, float cy, float r, float w, float h, uint32_t color) {
-    float x0 = (cx - r / g_aspect) * w, x1 = (cx + r / g_aspect) * w;
-    float y0 = (cy - r) * h, y1 = (cy + r) * h;
+    float px = cx * w, py = cy * h, s = r * h;
+    float x0 = px - s, x1 = px + s;
+    float y0 = py - s, y1 = py + s;
     Vtx q[4] = {{x0, y0, 0, 1, color, 0, 0}, {x1, y0, 0, 1, color, 1, 0},
                 {x0, y1, 0, 1, color, 0, 1}, {x1, y1, 0, 1, color, 1, 1}};
     v[0] = q[0]; v[1] = q[1]; v[2] = q[2];
@@ -363,14 +369,17 @@ void quad(Vtx *v, float cx, float cy, float r, float w, float h, uint32_t color)
 
 // ---- HUD art: the icon pack, unzipped to <game>/port/icons/ ---------------
 //
-// Every file is a 256x256 RGBA PNG (the artist's spec is in the repo's docs,
-// and a copy of it sits next to the ZIP). runtime/art.c packs them into one
-// atlas texture, so the whole overlay stays one draw call per texture, and
-// every icon is optional: whatever is missing keeps the procedural disc the
-// overlay has always drawn.
-ArtEntry g_art[ART_MAX];
+// Every file is a 256x256 RGBA PNG, and each one becomes its own texture.
+// It used to be packed into a 1024x1536 atlas and sampled by UV rect, which is
+// where the doubled buttons came from: on device every icon quad came out with
+// four neighbouring cells inside it (plain and pressed art of two actions in
+// one button). One texture per icon cannot do that -- the UVs are always the
+// full 0..1 -- and it is the same geometry the discs already use, so a button
+// can no longer look different from the stick. Every icon stays optional:
+// whatever is missing keeps the procedural disc.
+struct IconTex { char key[24]; IDirect3DTexture9 *tex; };
+IconTex g_icon[ART_MAX];
 int g_nart;
-IDirect3DTexture9 *g_atlas;
 bool g_art_tried;
 
 // The eight overlay buttons wear the icon of the action they press, in the
@@ -379,10 +388,19 @@ bool g_art_tried;
 // Back back).
 const char *k_button_icon[NB] = {"jump", "web", "punch", "kick", "wallcrawl", "black", "pause", "back"};
 
-const ArtEntry *art(const char *key) {
+const IconTex *icon(const char *key) {
     for (int i = 0; i < g_nart; i++)
-        if (!strcmp(g_art[i].key, key)) return &g_art[i];
+        if (!strcmp(g_icon[i].key, key)) return &g_icon[i];
     return nullptr;
+}
+
+// The art for button i: the pressed variant while it is held, the plain icon
+// otherwise, and nothing at all when the pack does not have either.
+const IconTex *icon_for(int i) {
+    char press[32];
+    snprintf(press, sizeof press, "on/%s", k_button_icon[i]);
+    const IconTex *t = (g_buttons & k_buttons[i].bit) ? icon(press) : nullptr;
+    return t ? t : icon(k_button_icon[i]);
 }
 
 // <game>/port/icons, and (in case the ZIP was unpacked flat) <game>/port itself
@@ -396,50 +414,43 @@ void icons_dirs(std::string *out, int *n) {
     out[(*n)++] = ".";
 }
 
-void load_atlas(IDirect3DDevice9 *d) {
+void load_icons(IDirect3DDevice9 *d) {
     g_art_tried = true;
     std::string dir[8];
     const char *cd[8];
     int nd = 0;
     icons_dirs(dir, &nd);
     for (int i = 0; i < nd; i++) cd[i] = dir[i].c_str();
+    ArtEntry e[ART_MAX];
     uint8_t *buf = nullptr;
     int aw = 0, ah = 0;
-    g_nart = art_load(cd, nd, g_art, ART_MAX, &buf, &aw, &ah);
-    if (!g_nart || !buf) {
+    int n = art_load(cd, nd, e, ART_MAX, &buf, &aw, &ah);
+    if (!n || !buf) {
         LOG("touch: no HUD icon pack in %s (drawing the plain overlay)", dir[0].c_str());
         return;
     }
-    if (FAILED(d->CreateTexture(aw, ah, 1, 0, D3DFMT_A8R8G8B8, D3DPOOL_MANAGED, &g_atlas, nullptr))) {
+    if (aw != ART_W || ah != ART_H) {
         free(buf);
-        g_nart = 0;
-        LOG("touch: icon atlas texture failed");
+        LOG("touch: icon pack produced a %dx%d sheet, expected %dx%d", aw, ah, ART_W, ART_H);
         return;
     }
-    D3DLOCKED_RECT lr;
-    if (SUCCEEDED(g_atlas->LockRect(0, &lr, nullptr, 0))) {
-        for (int y = 0; y < ah; y++)
-            memcpy((uint8_t *)lr.pBits + (size_t)y * lr.Pitch, buf + (size_t)y * aw * 4, (size_t)aw * 4);
-        g_atlas->UnlockRect(0);
+    for (int i = 0; i < n && g_nart < ART_MAX; i++) {
+        IDirect3DTexture9 *t = nullptr;
+        if (FAILED(d->CreateTexture(ART_CELL, ART_CELL, 1, 0, D3DFMT_A8R8G8B8, D3DPOOL_MANAGED, &t, nullptr))) continue;
+        D3DLOCKED_RECT lr;
+        if (FAILED(t->LockRect(0, &lr, nullptr, 0))) { t->Release(); continue; }
+        /* cell (col,row) of the packed sheet, one 256-pixel row at a time */
+        const uint8_t *src = buf + (size_t)(i / ART_COLS) * ART_CELL * ART_W * 4 +
+                             (size_t)(i % ART_COLS) * ART_CELL * 4;
+        for (int y = 0; y < ART_CELL; y++)
+            memcpy((uint8_t *)lr.pBits + (size_t)y * lr.Pitch, src + (size_t)y * ART_W * 4, (size_t)ART_CELL * 4);
+        t->UnlockRect(0);
+        snprintf(g_icon[g_nart].key, sizeof g_icon[g_nart].key, "%s", e[i].key);
+        g_icon[g_nart].tex = t;
+        g_nart++;
     }
     free(buf);
     LOG("touch: %d HUD icons loaded from %s", g_nart, dir[0].c_str());
-}
-
-// one icon, centred on (cx,cy), half-size r in screen-height units
-void art_quad(Vtx *v, const ArtEntry *a, float cx, float cy, float r, float w, float h, uint32_t color) {
-    float ax = r / g_aspect * w, ay = r * h, px = cx * w, py = cy * h;
-    Vtx q[4] = {{px - ax, py - ay, 0, 1, color, a->u0, a->v0}, {px + ax, py - ay, 0, 1, color, a->u1, a->v0},
-                {px - ax, py + ay, 0, 1, color, a->u0, a->v1}, {px + ax, py + ay, 0, 1, color, a->u1, a->v1}};
-    v[0] = q[0]; v[1] = q[1]; v[2] = q[2];
-    v[3] = q[2]; v[4] = q[1]; v[5] = q[3];
-}
-
-// the cursor art carries its tip at (16,16) of 256, so the quad is shifted so
-// that the tip lands exactly on the pointer
-void cursor_quad(Vtx *v, const ArtEntry *a, float cx, float cy, float r, float w, float h, uint32_t color) {
-    float off = r * (112.f / 128.f); /* tip -> centre, in the same units as r */
-    art_quad(v, a, cx + off / g_aspect, cy + off, r, w, h, color);
 }
 
 // The overlay is dimmed to g_hud_mul while nothing has been touched, so that it
@@ -531,37 +542,29 @@ void touch_draw(IDirect3DDevice9 *d) {
     d->SetSamplerState(0, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP);
     d->SetSamplerState(0, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP);
 
-    if (!g_art_tried) load_atlas(d);
+    if (!g_art_tried) load_icons(d);
 
-    /* Two batches: the plain discs (soft-edged texture) and the icon pack (the
-     * atlas). A button is drawn exactly once -- with its action icon when the
-     * pack has one, with the disc when it does not -- and never at all while
-     * the contextual HUD hides it. The stick stays procedural on purpose: the
-     * analog needs no art, so a missing pack can never take it away. */
+    /* Two passes: the plain discs (one soft-edged texture, one batch) and then
+     * one draw per action icon from its own texture -- full 0..1 UVs, so a quad
+     * can only ever show the icon it asked for. A button is drawn exactly once,
+     * with its icon when the pack has one and with the disc when it does not,
+     * and never while the contextual HUD hides it. The stick stays procedural
+     * on purpose: the analog needs no art, so a missing pack cannot take it
+     * away. */
     Vtx vd[6 * (NB + 6)];   /* stick, knob, disc fallbacks, camera hint, 2 cursor discs */
-    Vtx va[6 * (NB + 4)];   /* button icons, camera hint, cursor */
-    int nd = 0, na = 0;
+    int nd = 0;
     float sx, sy;
     stick_pos(&sx, &sy);
     quad(vd + 6 * nd++, sx, sy, STICK_R, w, h, dim(0x90FFFFFF));
     float kx = sx + g_stick_x * STICK_R / g_aspect, ky = sy + g_stick_y * STICK_R;
     quad(vd + 6 * nd++, kx, ky, STICK_R * 0.45f, w, h, dim(0xD0FFFFFF));
     for (int i = 0; i < NB; i++) {
-        if (!button_shown(i)) continue;
+        if (!button_shown(i) || icon_for(i)) continue;   /* icon buttons: pass 2 */
         float bx, by;
         button_pos(k_buttons[i], &bx, &by);
         bool on = (g_buttons & k_buttons[i].bit) != 0;
-        char press[32];
-        snprintf(press, sizeof press, "on/%s", k_button_icon[i]);
-        const ArtEntry *a = (on ? art(press) : nullptr);
-        if (!a) a = art(k_button_icon[i]);
-        if (a && g_atlas) {
-            art_quad(va + 6 * na++, a, bx, by, k_buttons[i].r * 1.06f, w, h,
-                     dim(on ? 0xFFFFFFFF : 0xE0FFFFFF));
-        } else {
-            quad(vd + 6 * nd++, bx, by, k_buttons[i].r, w, h,
-                 dim((k_buttons[i].color & 0xFFFFFF) | (on ? 0xF0u : 0x90u) << 24));
-        }
+        quad(vd + 6 * nd++, bx, by, k_buttons[i].r, w, h,
+             dim((k_buttons[i].color & 0xFFFFFF) | (on ? 0xF0u : 0x90u) << 24));
     }
 #ifdef GAME_USM
     /* Camera zone hint: only while the finger is dragging there. */
@@ -582,9 +585,17 @@ void touch_draw(IDirect3DDevice9 *d) {
         d->SetTexture(0, g_tex);
         d->DrawPrimitiveUP(D3DPT_TRIANGLELIST, 2 * nd, vd, sizeof(Vtx));
     }
-    if (na && g_atlas) {
-        d->SetTexture(0, g_atlas);
-        d->DrawPrimitiveUP(D3DPT_TRIANGLELIST, 2 * na, va, sizeof(Vtx));
+    for (int i = 0; i < NB; i++) {
+        if (!button_shown(i)) continue;
+        const IconTex *it = icon_for(i);
+        if (!it) continue;
+        float bx, by;
+        button_pos(k_buttons[i], &bx, &by);
+        bool on = (g_buttons & k_buttons[i].bit) != 0;
+        Vtx q[6];
+        quad(q, bx, by, k_buttons[i].r * 1.06f, w, h, dim(on ? 0xFFFFFFFF : 0xE0FFFFFF));
+        d->SetTexture(0, it->tex);
+        d->DrawPrimitiveUP(D3DPT_TRIANGLELIST, 2, q, sizeof(Vtx));
     }
     d->EndScene();
     d->SetRenderTarget(0, old);

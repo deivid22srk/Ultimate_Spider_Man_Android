@@ -349,9 +349,18 @@ buttons. Which icon each button wears follows from that table:
 The art is the port's own (generated for this port, never extracted from the
 game); it is unzipped next to the port's folder as `<game>/port/icons/`, with
 the pressed variants in `icons/on/`. `runtime/art.c` packs whatever it finds
-into one 1024×1536 atlas uploaded as a `D3DFMT_A8R8G8B8` texture, so the whole
-overlay is two `DrawPrimitiveUP` calls (plain discs + icons); **every icon is
-optional** and a missing file falls back to the disc. `runtime/touch.cpp` logs
+into one 1024×1536 sheet and `touch.cpp` turns each cell into its own 256×256
+`D3DFMT_A8R8G8B8` texture, so every icon quad samples the full 0..1 range and
+the whole overlay is one `DrawPrimitiveUP` for the discs plus one per icon;
+**every icon is optional** and a missing file falls back to the disc.
+
+The sheet used to be uploaded as a single atlas sampled by UV rect, and that is
+what put two actions inside every button on device: `art_load` wrote each icon
+at a linear offset (`n * 256×256×4`) while computing UVs for a 4×6 grid, so the
+cell an entry pointed at held slices of four neighbouring icons — the plain and
+pressed art of two actions, squashed. `tools/art_test.c` reproduced it offline
+(`diff=31948` for `hud_jump.png`); with the pixels written on the grid every cell
+matches its PNG byte for byte. `runtime/touch.cpp` logs
 `touch: N HUD icons loaded from <dir>` on the first frame, which is how a run
 is confirmed from `port/log.txt`.
 

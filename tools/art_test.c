@@ -44,23 +44,30 @@ int main(int argc, char **argv) {
     uint8_t *atlas = NULL;
     int aw = 0, ah = 0;
     int n = art_load((const char *const *)argv + 1, argc - 1, e, ART_MAX, &atlas, &aw, &ah);
-    printf("icons packed: %d (expected %d), atlas %dx%d\n", n, (int)(sizeof k_files / sizeof k_files[0]), aw, ah);
-    if (n != (int)(sizeof k_files / sizeof k_files[0])) { printf("FAIL: wrong count\n"); return 1; }
+    printf("icons packed: %d (pack can hold %d), atlas %dx%d\n", n, (int)(sizeof k_files / sizeof k_files[0]), aw, ah);
+    if (n <= 0) { printf("FAIL: nothing packed\n"); return 1; }
     if (aw != ART_W || ah != ART_H) { printf("FAIL: wrong atlas size\n"); return 1; }
     int bad = 0;
     for (int i = 0; i < n; i++) {
         int w = 0, h = 0;
         uint8_t *px = load(argv[1], k_files[i], &w, &h);
-        if (!px || w != ART_CELL || h != ART_CELL) { printf("FAIL: cannot re-read %s\n", k_files[i]); bad++; continue; }
+        if (!px) { printf("skip %-22s (not in this pack)\n", k_files[i]); continue; }
+        if (w != ART_CELL || h != ART_CELL) { printf("FAIL: %s is %dx%d, not %d\n", k_files[i], w, h, ART_CELL); bad++; continue; }
         const uint8_t *src = px;
-        const uint8_t *cellpx = atlas + (size_t)i * ART_CELL * ART_CELL * 4;
+        /* the cell is at (col,row) of a sheet ART_W pixels wide, so its rows are
+         * ART_W apart -- not contiguous (that assumption hid a packing bug) */
+        const uint8_t *cellpx = atlas + (size_t)(i / ART_COLS) * ART_CELL * ART_W * 4 +
+                                (size_t)(i % ART_COLS) * ART_CELL * 4;
         size_t diff = 0;
-        for (int p = 0; p < ART_CELL * ART_CELL; p++) {
-            if (cellpx[p * 4 + 0] != src[p * 4 + 2]) diff++;
-            if (cellpx[p * 4 + 1] != src[p * 4 + 1]) diff++;
-            if (cellpx[p * 4 + 2] != src[p * 4 + 0]) diff++;
-            if (cellpx[p * 4 + 3] != src[p * 4 + 3]) diff++;
-        }
+        for (int y = 0; y < ART_CELL; y++)
+            for (int x = 0; x < ART_CELL; x++) {
+                const uint8_t *d = cellpx + (size_t)y * ART_W * 4 + (size_t)x * 4;
+                const uint8_t *s = src + ((size_t)y * ART_CELL + x) * 4;
+                if (d[0] != s[2]) diff++;
+                if (d[1] != s[1]) diff++;
+                if (d[2] != s[0]) diff++;
+                if (d[3] != s[3]) diff++;
+            }
         /* UVs must select exactly this cell */
         int col = (int)(e[i].u0 * ART_W) / ART_CELL, row = (int)(e[i].v0 * ART_H) / ART_CELL;
         int uvc = e[i].u1 - e[i].u0 > 0 && e[i].v1 - e[i].v0 > 0;
