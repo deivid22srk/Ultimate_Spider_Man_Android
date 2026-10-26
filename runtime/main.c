@@ -21,6 +21,7 @@
 
 uint8_t *MEM;
 int g_log_level = 1;
+void usm_map_watch_set(int on);
 char g_game_dir[1024] = ".";
 char g_save_dir[1024] = "./save";
 uint32_t g_image_size;
@@ -468,6 +469,9 @@ int main(int argc, char **argv) {
                 unlink(logp);
                 freopen("/dev/null", "w", stderr);
             }
+            /* The entity-map watch is a diagnostic and a full walk per heap
+             * operation: debug logging only. */
+            usm_map_watch_set(g_log_level > 1);
         }
 
         argc = 1;  /* consumed */

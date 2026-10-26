@@ -61,7 +61,15 @@ static void set_block(uint32_t b, uint32_t size, int used) {
  * A corrupted link surfaces much later as a crash inside the map code, so
  * check the list after every heap operation and remember the first time it
  * is seen broken: that names the operation that corrupted it. */
-static int g_map_watch = 1;
+/* The entity-map watch walks the game's map on every heap operation. It was
+ * on by default, which cost a full walk per malloc/free during gameplay and,
+ * worse, made the game's startup timing depend on a read-only observer: on
+ * Android 14 the extra work desynchronises the load path and the map ends up
+ * with a bogus link (node.next = 9 -> a write at guest address 0x0D). It is a
+ * diagnostic, so it now runs only when debug logging asks for it. */
+static int g_map_watch = 0;
+
+void usm_map_watch_set(int on) { g_map_watch = on ? 1 : 0; }
 static int g_map_hard;              /* first hard failure seen */
 static int g_map_soft;              /* walk length != map size */
 static uint32_t g_map_op_ret, g_map_op_ptr, g_map_op_node, g_map_op_i;
@@ -115,7 +123,8 @@ static int on_guest_stack(CPU *c, uint32_t want) {
 }
 
 void usm_map_watch_note(const char *op, uint32_t req, uint32_t ptr) {
-    if (!g_map_watch) return;
+    if (!g_map_watch || op[0] != 'm') return;   /* malloc only: that is where the
+                                                * insert walks the chain */
     uint32_t map = 0x95B79Cu;
     uint32_t sent = M32(map + 0x08), size = M32(map + 0x24), mask = M32(map + 0x20);
     if (sent < GUEST_HEAP_BASE || sent >= GUEST_HEAP_END) return;
@@ -143,7 +152,7 @@ void usm_map_watch_note(const char *op, uint32_t req, uint32_t ptr) {
             g_map_watch = 0;
             return;
         }
-        if (++i > 8192) {
+        if (++i > 512) {
             /* the entity map outgrew the watch (1000+ entries once the game
              * is up): stop walking every heap op instead of misreporting */
             g_map_watch = 0;
@@ -226,7 +235,21 @@ void gfree(uint32_t p) {
         LOG("double free of %08x", p);
         return;
     }
+    /* A pointer that is not a block start (interior pointer, or one handed out
+     * by a private heap) has a nonsense header. Freeing it used to splice a bogus
+     * block into a bin, and the next malloc then handed out memory that was still
+     * in use: that is how the game's entity map ends up with a link like 9. Drop
+     * such a free instead of corrupting the heap. */
     uint32_t sz = BSIZE(b);
+    if ((b & 15u) || sz < MINBLK || sz > (GUEST_HEAP_END - GUEST_HEAP_BASE) ||
+        (uint32_t)(b + sz) > g_top || (uint32_t)(b + sz) < b) {
+        static int warned;
+        if (warned++ < 10)
+            LOG("gfree(%08x): block %08x header is %08x/%08x, dropped", p, b,
+                M32(b), M32(b + 4));
+        pthread_mutex_unlock(&g_heap_lock);
+        return;
+    }
     /* merge with next */
     uint32_t nx = b + sz;
     if (nx < g_top && !BUSED(nx)) {
