@@ -171,6 +171,8 @@ SHIM(SetCursorPos) { user32_cursor_set((int)ARG(0), (int)ARG(1)); RET(1, 2); }
 /* real display counter: games loop "while (ShowCursor(FALSE) >= 0)" */
 static volatile int g_cursor_count = 0;
 SHIM(ShowCursor) { int n = ARG(0) ? __atomic_add_fetch(&g_cursor_count, 1, __ATOMIC_SEQ_CST) : __atomic_sub_fetch(&g_cursor_count, 1, __ATOMIC_SEQ_CST); RET((uint32_t)n, 1); }
+/* For the touch HUD's context: the game shows its system cursor for menus. */
+int user32_cursor_visible(void) { return __atomic_load_n(&g_cursor_count, __ATOMIC_SEQ_CST) >= 0; }
 SHIM(LoadKeyboardLayoutA) { RET(0x04090409, 2); }
 /* US layout: virtual-key <-> PC set-1 scan code */
 static const uint8_t k_vk_sc[][2] = {

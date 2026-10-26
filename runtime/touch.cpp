@@ -109,8 +109,37 @@ void stick_pos(float *x, float *y) {
     *y = 1 + STICK_Y;
 }
 
+// Contextual HUD (opt-in: touch.cfg 5th field). Off keeps the classic HUD
+// exactly. On, the menus show only the buttons that do something there.
+bool g_hud_ctx;
+bool g_hud_menu_last;
+
+// Menu = the game is showing its cursor (ShowCursor count >= 0 while it
+// drives menus with the system cursor). Only used when g_hud_ctx is on.
+bool hud_menu() {
+#ifdef GAME_USM
+    extern "C" int user32_cursor_visible(void);
+    bool m = user32_cursor_visible() != 0;
+    if (m != g_hud_menu_last) {
+        g_hud_menu_last = m;
+        LOG("touch: HUD context -> %s", m ? "menu" : "game");
+    }
+    return m;
+#else
+    return false;
+#endif
+}
+
+// Buttons shown in the current context. A: Enter (confirm). Start: Esc (back/pause).
+bool button_shown(int i) {
+    if (!g_hud_ctx) return true;
+    if (!hud_menu()) return true;
+    return strcmp(k_buttons[i].name, "A") == 0 || strcmp(k_buttons[i].name, "Start") == 0;
+}
+
 int hit_button(float x, float y) {
     for (int i = 0; i < NB; i++) {
+        if (!button_shown(i)) continue;
         float bx, by;
         button_pos(k_buttons[i], &bx, &by);
         float dx = (x - bx) * g_aspect, dy = y - by, r = k_buttons[i].r * 1.3f;
@@ -135,6 +164,8 @@ void update() {
             // a finger may slide between buttons
             int h = hit_button(f.x, f.y);
             if (h >= 0) f.button = h;
+            /* a finger on a button that the context just hid lets go of it */
+            if (f.button >= 0 && !button_shown(f.button)) f.button = -1;
             if (f.button >= 0) b |= k_buttons[f.button].bit;
         }
     }
@@ -464,6 +495,7 @@ void touch_draw(IDirect3DDevice9 *d) {
     float kx = sx + g_stick_x * STICK_R / g_aspect, ky = sy + g_stick_y * STICK_R;
     quad(vd + 6 * nd++, kx, ky, STICK_R * 0.45f, w, h, dim(0xD0FFFFFF));
     for (int i = 0; i < NB; i++) {
+        if (!button_shown(i)) continue;
         float bx, by;
         button_pos(k_buttons[i], &bx, &by);
         bool on = (g_buttons & k_buttons[i].bit) != 0;
@@ -508,7 +540,7 @@ extern "C" int g_log_level;
 static void save_cfg() {
     if (FILE *f = fopen(cfg_path().c_str(), "w")) {
         /* 4th field: log level (0 off, 1 normal, 2 debug); read in main() */
-        fprintf(f, "%d %d %d %d\n", g_touch_on, g_nintendo, g_skip_cutscenes, g_log_level);
+        fprintf(f, "%d %d %d %d %d\n", g_touch_on, g_nintendo, g_skip_cutscenes, g_log_level, g_hud_ctx);
         fclose(f);
     }
 }
@@ -934,8 +966,12 @@ extern "C" void touch_setup_guest(void) {
 #endif
     if (!available()) return;
     if (FILE *f = fopen(cfg_path().c_str(), "r")) {
-        int t = 1, n = 0, k = 0;
-        if (fscanf(f, "%d %d %d", &t, &n, &k) >= 1) { g_touch_on = t != 0; g_nintendo = n != 0; g_skip_cutscenes = k != 0; }
+        int t = 1, n = 0, k = 0, lg = 1, hc = 0;
+        /* 5th field: contextual HUD on/off (default off = the classic HUD) */
+        if (fscanf(f, "%d %d %d %d %d", &t, &n, &k, &lg, &hc) >= 1) {
+            g_touch_on = t != 0; g_nintendo = n != 0; g_skip_cutscenes = k != 0;
+            g_hud_ctx = hc != 0;
+        }
         fclose(f);
     }
     input_set_nintendo(g_nintendo);
