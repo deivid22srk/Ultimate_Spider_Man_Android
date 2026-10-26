@@ -391,9 +391,12 @@ static void pp_fix_size(D3DPRESENT_PARAMETERS *pp) {
     user32_set_screen(ww, wh);
     uint32_t bw = pp->BackBufferWidth, bh = pp->BackBufferHeight;
     if (!bw || !bh) return;
-    long long off = (long long)bw * wh - (long long)bh * ww; /* aspect error, in windows */
+    /* Same aspect when bw/bh == ww/wh, i.e. bw*wh == bh*ww. The old test
+     * compared that area-sized cross product against wh (a height), so a
+     * back buffer a few pixels off the window's aspect was not corrected. */
+    long long off = (long long)bw * wh - (long long)bh * ww;
     if (off < 0) off = -off;
-    if (off <= (long long)wh) return;                        /* already the window's aspect */
+    if (off == 0) return;                                    /* exactly the window's aspect */
     LOG("back buffer %ux%u is not the window's aspect: using %ux%u (mode 0) so dxvk does not stretch the frame",
         bw, bh, (unsigned)ww, (unsigned)wh);
     pp->BackBufferWidth = (uint32_t)ww;
