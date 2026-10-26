@@ -121,6 +121,8 @@ public class UsmLauncherActivity extends Activity {
         check(root, "touch", "Touch controls", true);
         check(root, "nintendo", "Nintendo button layout (A/B, X/Y swapped)", false);
         check(root, "vsync", "Vertical sync", true);
+        check(root, "debuglog", "Debug log (verbose, slower)", false);
+        check(root, "logoff", "No log file (turn logging off)", false);
 
         playButton = new Button(this);
         playButton.setText("Play");
@@ -286,9 +288,28 @@ public class UsmLauncherActivity extends Activity {
         String folder = prefs.getString("folder", null);
         File save = new File(folder, "port/save");
         save.mkdirs();
-        try (Writer w = new OutputStreamWriter(new FileOutputStream(new File(save, "touch.cfg")))) {
+        /* Read the skip-cutscenes value the game saved BEFORE opening the file
+         * for writing: FileOutputStream truncates it. */
+        int skip = 0;
+        File cfg = new File(save, "touch.cfg");
+        if (cfg.exists()) {
+            try (java.io.BufferedReader r = new java.io.BufferedReader(new java.io.FileReader(cfg))) {
+                String line = r.readLine();
+                if (line != null) {
+                    String[] p = line.trim().split(" ");
+                    if (p.length >= 3) skip = Integer.parseInt(p[2]);
+                }
+            } catch (Exception ignored) {
+                /* unreadable or old format: keep skip at 0 */
+            }
+        }
+        try (Writer w = new OutputStreamWriter(new FileOutputStream(cfg))) {
+            /* touch nintendo skip-cutscenes log-level (0 off, 1 normal, 2 debug) */
+            int logLevel = checks.get("logoff").isChecked() ? 0 : checks.get("debuglog").isChecked() ? 2 : 1;
             w.write((checks.get("touch").isChecked() ? "1" : "0") + " "
-                    + (checks.get("nintendo").isChecked() ? "1" : "0") + "\n");
+                    + (checks.get("nintendo").isChecked() ? "1" : "0") + " "
+                    + skip + " "
+                    + logLevel + "\n");
             try (Writer v = new OutputStreamWriter(new FileOutputStream(new File(save, "vsync.cfg")))) {
                 v.write(checks.get("vsync").isChecked() ? "1\n" : "0\n");
             }

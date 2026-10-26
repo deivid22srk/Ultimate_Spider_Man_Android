@@ -446,7 +446,8 @@ int main(int argc, char **argv) {
                 char cfgp[1100];
                 snprintf(cfgp, sizeof cfgp, "%s/touch.cfg", g_save_dir);
                 int lvl = 1;
-                if (FILE *cf = fopen(cfgp, "r")) {
+                FILE *cf = fopen(cfgp, "r");
+                if (cf) {
                     int t, nn, k, l;
                     if (fscanf(cf, "%d %d %d %d", &t, &nn, &k, &l) == 4) lvl = l;
                     fclose(cf);
