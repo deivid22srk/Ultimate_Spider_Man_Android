@@ -40,7 +40,7 @@ env:
   USM_KEY_PASSWORD: usm-release-2005
   # SHA-256 of the release certificate. Update it only if the key is replaced on
   # purpose; every APK before that point then stops being an update target.
-  USM_CERT_SHA256: "7537f4a31a3159328bf08b6da07ed56b8991ed58674567a6af9216594f19693d1f"
+  USM_CERT_SHA256: "7537f4a31a3159328bf08b6da07ed56b8991ed584567a6af9216594f19693d1f"
 
 jobs:
   apk:
@@ -129,7 +129,8 @@ jobs:
           test -f "$apk" || { echo "no release APK"; exit 1; }
           "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --print-certs "$apk" \
             | tee certs.txt
-          got=$(grep -o 'certificate SHA-256 digest: [0-9a-f]*' certs.txt | head -1 | cut -d' ' -f4)
+          got=$(grep -o 'certificate SHA-256 digest: [0-9a-fA-F]*' certs.txt \
+                | head -1 | awk '{print tolower($NF)}')
           if [ "$got" != "$USM_CERT_SHA256" ]; then
             echo "signing key changed: expected $USM_CERT_SHA256, got $got"
             echo "an APK with a different key cannot install over the published one"
