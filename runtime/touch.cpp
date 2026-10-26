@@ -117,12 +117,20 @@ bool g_hud_menu_last;
 // Menu = the game is showing its cursor (ShowCursor count >= 0 while it
 // drives menus with the system cursor). Only used when g_hud_ctx is on.
 extern "C" int user32_cursor_visible(void);
+extern "C" unsigned user32_cursor_reads(void);
 bool hud_menu() {
 #ifdef GAME_USM
-    bool m = user32_cursor_visible() != 0;
+    /* The front end polls GetCursorPos to hit-test its widgets; gameplay
+     * reads the mouse device's relative axes instead. A rising read count
+     * therefore means the game is in a menu. Sticky 1.2 s so gaps between
+     * polls don't flip the overlay back and forth. */
+    static uint32_t last_reads, menu_until;
+    uint32_t now = SDL_GetTicks(), r = user32_cursor_reads();
+    if (r != last_reads) { last_reads = r; menu_until = now + 1200; }
+    bool m = now < menu_until || user32_cursor_visible() != 0;
     if (m != g_hud_menu_last) {
         g_hud_menu_last = m;
-        LOG("touch: HUD context -> %s", m ? "menu" : "game");
+        LOG("touch: HUD context -> %s (cursor reads %u)", m ? "menu" : "game", r);
     }
     return m;
 #else
@@ -968,11 +976,14 @@ extern "C" void touch_setup_guest(void) {
     if (FILE *f = fopen(cfg_path().c_str(), "r")) {
         int t = 1, n = 0, k = 0, lg = 1, hc = 0;
         /* 5th field: contextual HUD on/off (default off = the classic HUD) */
-        if (fscanf(f, "%d %d %d %d %d", &t, &n, &k, &lg, &hc) >= 1) {
+        int got = fscanf(f, "%d %d %d %d %d", &t, &n, &k, &lg, &hc);
+        if (got >= 1) {
             g_touch_on = t != 0; g_nintendo = n != 0; g_skip_cutscenes = k != 0;
             g_hud_ctx = hc != 0;
         }
         fclose(f);
+        LOG("touch: touch.cfg %d field(s): touch=%d nintendo=%d skip=%d log=%d hudctx=%d",
+            got, g_touch_on, g_nintendo, g_skip_cutscenes, lg, g_hud_ctx);
     }
     input_set_nintendo(g_nintendo);
     input_set_skip_cutscenes(g_skip_cutscenes);

@@ -173,6 +173,11 @@ static volatile int g_cursor_count = 0;
 SHIM(ShowCursor) { int n = ARG(0) ? __atomic_add_fetch(&g_cursor_count, 1, __ATOMIC_SEQ_CST) : __atomic_sub_fetch(&g_cursor_count, 1, __ATOMIC_SEQ_CST); RET((uint32_t)n, 1); }
 /* For the touch HUD's context: the game shows its system cursor for menus. */
 int user32_cursor_visible(void) { return __atomic_load_n(&g_cursor_count, __ATOMIC_SEQ_CST) >= 0; }
+/* Counts GetCursorPos calls. The menus hit-test their widgets against the
+ * cursor on every poll; gameplay reads the mouse device's relative axes
+ * instead, so a rising count means "the UI is being driven". */
+static volatile uint32_t g_cursor_reads;
+uint32_t user32_cursor_reads(void) { return __atomic_load_n(&g_cursor_reads, __ATOMIC_SEQ_CST); }
 SHIM(LoadKeyboardLayoutA) { RET(0x04090409, 2); }
 /* US layout: virtual-key <-> PC set-1 scan code */
 static const uint8_t k_vk_sc[][2] = {
@@ -366,6 +371,7 @@ SHIM(GetWindowThreadProcessId) { if (ARG(1)) M32(ARG(1)) = 0x42; RET(1, 2); }
 SHIM(ClientToScreen) { RET(1, 2); }
 SHIM(ScreenToClient) { RET(1, 2); }
 SHIM(GetCursorPos) {
+    __atomic_add_fetch(&g_cursor_reads, 1, __ATOMIC_SEQ_CST);
     if (ARG(0)) {
         int x, y;
         user32_cursor_get(&x, &y);
