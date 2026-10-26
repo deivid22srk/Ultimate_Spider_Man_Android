@@ -945,14 +945,21 @@ extern "C" void touch_setup_guest(void) {
     return;
 #endif
 #ifdef GAME_USM
-    /* Ultimate Spider-Man: no menu hooks yet. The Android launcher writes
-     * touch.cfg ("<touch> <nintendo>"), exactly as for Skyrim. */
+    /* Ultimate Spider-Man: the Android launcher writes touch.cfg
+     * ("<touch> <nintendo> <skip> <log> <hudctx>"). */
     if (FILE *f = fopen(cfg_path().c_str(), "r")) {
-        int t = 1, n = 0;
-        if (fscanf(f, "%d %d", &t, &n) >= 1) { g_touch_on = t != 0; g_nintendo = n != 0; }
+        int t = 1, n = 0, k = 0, lg = 1, hc = 0;
+        int got = fscanf(f, "%d %d %d %d %d", &t, &n, &k, &lg, &hc);
+        if (got >= 1) {
+            g_touch_on = t != 0; g_nintendo = n != 0;
+            g_skip_cutscenes = k != 0; g_hud_ctx = hc != 0;
+        }
         fclose(f);
+        LOG("touch: touch.cfg %d field(s): touch=%d nintendo=%d skip=%d log=%d hudctx=%d",
+            got, g_touch_on, g_nintendo, g_skip_cutscenes, lg, g_hud_ctx);
     }
     input_set_nintendo(g_nintendo);
+    input_set_skip_cutscenes(g_skip_cutscenes);
     {   /* diagnostics: pcconfig.txt holds this game's resolution and aspect
          * ratio; log its keys once, so a run's log.txt shows exactly which
          * of them this build could force (the display sync in d3d9_bridge
