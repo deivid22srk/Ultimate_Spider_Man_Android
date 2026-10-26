@@ -29,7 +29,9 @@ namespace dxvk {
 
   /** Whether depth clamping may be enabled in pipelines (not on all mobile GPUs). */
   extern bool g_dxvkDepthClamp;
-  /** Port: UBYTE4 vertex data is fetched as R8G8B8A8_UINT (no USCALED vertex support). */
+  /** Port: fetch UBYTE4/SHORT2/SHORT4 as normalized formats and let the vertex
+   *  shaders rescale by 255/32767 (only when the driver cannot fetch the
+   *  scaled formats natively). LB_NOSCALED overrides. */
   extern bool g_dxvkUbyte4AsUint;
 
   

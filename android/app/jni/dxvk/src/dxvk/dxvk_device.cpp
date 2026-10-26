@@ -25,17 +25,44 @@ namespace dxvk {
     m_submissionQueue   (this) {
     g_dxvkDepthClamp = features.core.features.depthClamp;
     {
-      VkFormatProperties fp = adapter->formatProperties(VK_FORMAT_R8G8B8A8_USCALED);
+      // A D3D9 vertex element of UBYTE4/SHORT2/SHORT4 means "fetch the raw
+      // integer". Vulkan can do that exactly with the *_USCALED/_SSCALED
+      // vertex formats. When the driver lacks any of them the port fetches the
+      // normalized formats instead and the vertex shaders undo the
+      // normalization with the VertexScaleMask spec constant (see
+      // DecodeDecltype in d3d9_util.cpp and emitInputSetup in dxso_compiler.cpp).
+      auto hasScaledFetch = [&adapter] (VkFormat format) {
+        return (adapter->formatProperties(format).bufferFeatures
+                & VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT) != 0;
+      };
+
+      const bool ubyte4 = hasScaledFetch(VK_FORMAT_R8G8B8A8_USCALED);
+      const bool short2 = hasScaledFetch(VK_FORMAT_R16G16_SSCALED);
+      const bool short4 = hasScaledFetch(VK_FORMAT_R16G16B16A16_SSCALED);
+      const bool native = ubyte4 && short2 && short4;
+
       const char* force = std::getenv("LB_NOSCALED");
-      g_dxvkUbyte4AsUint = !(fp.bufferFeatures & VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT)
-                        || (force && *force == '1');
+      if (force && *force) {
+        // LB_NOSCALED=1 forces the normalized path, =0 forces the scaled one.
+        g_dxvkUbyte4AsUint = (*force == '1');
+      } else {
+        g_dxvkUbyte4AsUint = !native;
 #ifdef __ANDROID__
-      // Mobile drivers are unreliable with scaled formats; the UINT path is exact everywhere.
-      g_dxvkUbyte4AsUint = true;
+        // Only second-guess the driver where the port was developed. The
+        // reference Adreno device (0x5143) advertises the scaled formats but
+        // has always run through the normalization path, so keep it there.
+        // Mali (0x13B5) advertises them too, and there the normalization
+        // rescale corrupts skinned character vertices -- SHORT4 positions
+        // stretch into spikes -- so let it use the native scaled formats.
+        if (adapter->deviceProperties().vendorID == 0x5143u)
+          g_dxvkUbyte4AsUint = true;
 #endif
+      }
+
       Logger::info(str::format("Port: USCALED vertex fetch ",
-        (fp.bufferFeatures & VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT) ? "supported" : "NOT supported",
-        g_dxvkUbyte4AsUint ? ", UBYTE4/SHORT fetched normalized + rescaled" : ""));
+        native ? "supported" : "NOT supported",
+        g_dxvkUbyte4AsUint ? ", UBYTE4/SHORT fetched normalized + rescaled"
+                           : ", UBYTE4/SHORT fetched scaled"));
     }
     auto queueFamilies = m_adapter->findQueueFamilies();
     m_queues.graphics = getQueue(queueFamilies.graphics, 0);

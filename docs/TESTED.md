@@ -55,6 +55,7 @@ Actions (NDK 27.2.12479018, clang 18).
 | Android launcher (folder validation, SHA-1 check, options) | only exercised by hand so far |
 | `runtime/usm_shims.c` CRT/dialog/image-list shims beyond the exercised paths | compiles, but not every shim has been hit by real game code |
 | `tools/difftest.py` (lifter self-test) | `unicorn` does not build in this Termux/Android environment; run it on a normal Linux host |
+| Mali vertex formats: use the driver's native scaled UBYTE4/SHORT2/SHORT4 fetch instead of the forced normalized+rescale path (`g_dxvkUbyte4AsUint`, §11f of `docs/RECON.md`) | fixes the Mali-G615/G57 character-mesh spikes (`issue #1`). Offline check: `clang++ -fsyntax-only` on `dxvk_device.cpp` with the target's flags and the tree's `-Wno-everything`, exit 0. No Mali device here, so the on-device run that shows `UBYTE4/SHORT fetched scaled` and no spikes is still pending; Adreno keeps the old path |
 
 ## Not implemented / blocked
 

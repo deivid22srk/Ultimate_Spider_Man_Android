@@ -476,6 +476,49 @@ space `user32_set_screen` parks matches what the menus divide it by.
 config's resolution/aspect key names are visible in `port/log.txt` for any
 future work that wants to force them at the source.
 
+## 11f. Mali: the forced normalized vertex fetch corrupted skinned meshes (issue #1)
+
+The first Mali report (`issue #1`, Mali-G615 MC6 / Dimensity 8350, and a
+Mali-G57 log) is a *geometry* glitch, not a display one: the world and the HUD
+are fine but character meshes grow spikes ("arrows into the sky"). The log pins
+it to the vertex path:
+
+    Port: USCALED vertex fetch supported, UBYTE4/SHORT fetched normalized + rescaled
+    D3D9: vertex decltype 7 usage 0 -> VK_FORMAT_R16G16B16A16_SNORM
+
+`decltype 7` is `D3DDECLTYPE_SHORT4` and `usage 0` is POSITION — the skinned
+characters store positions (and normals) as raw 16-bit integers, while the
+static world uses `D3DDECLTYPE_FLOAT3` (the same log shows
+`decltype 2 usage 0 -> VK_FORMAT_R32G32B32_SFLOAT`). That is exactly why only
+the characters break.
+
+A raw D3D9 integer element must be fetched unscaled (Vulkan `*_SSCALED` /
+`*_USCALED` vertex formats). The port's `DecodeDecltype` has two modes: the
+native scaled formats, or — when they are missing — the normalized formats plus
+a rescale in the vertex shader (`VertexScaleMask`, bits 1/2/3 per input in
+`dxso_compiler.cpp`). `dxvk_device.cpp` unconditionally forced the second mode
+on *every* Android device with
+
+    #ifdef __ANDROID__
+      // Mobile drivers are unreliable with scaled formats...
+      g_dxvkUbyte4AsUint = true;
+    #endif
+
+even when the driver (Mali here) advertises the scaled formats, which is what
+the log line above says in as many words. On Mali the spec-constant rescale and
+`R16G16B16A16_SNORM` fetch do not reproduce the raw integer, so the position
+values are wrong and the mesh explodes.
+
+The fix keeps the fallback only where it is needed: `g_dxvkUbyte4AsUint` is now
+decided per format from actual vertex-buffer support (`R8G8B8A8_USCALED`,
+`R16G16_SSCALED`, `R16G16B16A16_SSCALED`), the reference Adreno device
+(`vendorID 0x5143`, where the fallback has always been validated) keeps it
+explicitly, and `LB_NOSCALED=1` / `=0` still override both ways. Mali and any
+other driver with native scaled fetch now use it, which is what upstream DXVK
+does. Verify on a Mali device: the character spikes should be gone and
+`port/log.txt` should read `..., UBYTE4/SHORT fetched scaled` instead of
+`normalized + rescaled`.
+
 ## 12. Risk plan
 
 | Risk | Likelihood | Mitigation |
