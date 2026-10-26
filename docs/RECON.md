@@ -409,6 +409,54 @@ overlay again. It also fades the overlay to 30 % after 2.5 s without a touch
 (back to full on any touch), so it stops covering the game's own menus, which
 are tapped through the virtual cursor — a stopgap until the contextual HUD.
 
+## 11e. The corner-render regression: back buffer at the window's aspect (measured, fixed again)
+
+Section 11d stopped dxvk stretching the frame by rewriting every back buffer
+whose aspect is not the window's to the window's own size
+(`pp_fix_size`). On the device that produced the opposite problem: the game
+kept laying out, clearing and presenting at *its own* resolution (the
+`pcconfig.txt` size it asked for, 800x600), so only the top-left 800x600 of
+the 2285x1080 back buffer was ever written. Screenshot
+`Screenshot_20261025-202201.png`: the game in a 4:3 box in the corner, the
+rest of the screen stale, and the touch overlay spread over the whole window
+while the game's own menus sat in the box.
+
+Two measurable consequences from `2log.txt`:
+
+* `touch: tap 144,591 -> cursor 330,639 (screen 2285x1080)`: taps are warped
+  into the client space (the window), but the game hit-tests its widgets by
+  dividing the cursor by that same client rect into a *640-wide* UI space
+  (see the `cursor: game read` diagnostic in `user32.c`) that is only drawn
+  inside the 800x600 box — drawn UI space and hit-tested UI space were two
+  different spaces, so taps landed on the wrong widget (or on nothing).
+* The regions of the back buffer the game never writes flip between the
+  swap chain images, which reads as flicker around the 4:3 box.
+
+Fix, in `runtime/d3d9_bridge.cpp` (`pp_sync_client`, replacing
+`pp_fix_size`): the back buffer keeps the size the game asked for, dxvk
+stretches the finished frame across the whole window (fullscreen; the touch
+overlay already corrects its own layout for the presented aspect, §11d), and
+the client rect — `GetClientRect`, `GetWindowRect`, `GetSystemMetrics`, the
+cursor clamp and the touch cursor — follows the **back buffer**, exactly as
+Windows would report them for an exclusive-fullscreen 800x600 game. The
+per-frame client-follows-window logic is gone from
+`platform_present_hook`; `CreateDevice` and `Reset` are the only points that
+may move the client.
+
+To keep the stretch small, `runtime/touch.cpp` (`usm_rewrite_pcconfig`, run
+from `touch_setup_guest` before the game's entry point) rewrites the
+resolution keys of the game's own `pcconfig.txt` to the display size and
+`Widescreen` to the engine's "From Screen-Res" value (3), only for keys the
+file actually has, logging every rewrite and the full key list (so a file
+that names its keys differently is visible in `port/log.txt` and can be
+supported later). With the rewrite effective the game renders native
+(no stretch); without it the 800x600 frame is stretched to fill.
+
+The Android window also lost ~115 px to the system bars/cutout (2400x1080
+panel, 2285x1080 window, the compositor offset §11d measured): the activity
+now applies `LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES` and sticky immersive
+flags (`UsmActivity.java`) so the window covers the display.
+
 ## 12. Risk plan
 
 | Risk | Likelihood | Mitigation |

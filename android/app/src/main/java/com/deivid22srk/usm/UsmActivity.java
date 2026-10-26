@@ -27,6 +27,33 @@ public class UsmActivity extends SDLActivity {
     protected void onCreate(Bundle savedInstanceState) {
         saveLastExit();
         super.onCreate(savedInstanceState);
+        applyEdgeToEdge();
+    }
+
+    /* True edge-to-edge: without it the window settles below the status
+     * bar/cutout (e.g. 2285x1080 on a 2400x1080 panel) and the compositor
+     * letterboxes the frame with black bars on the sides. */
+    private void applyEdgeToEdge() {
+        android.view.Window w = getWindow();
+        if (Build.VERSION.SDK_INT >= 28) {
+            android.view.WindowManager.LayoutParams lp = w.getAttributes();
+            lp.layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams
+                    .LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+            w.setAttributes(lp);
+        }
+        android.view.View d = w.getDecorView();
+        d.setSystemUiVisibility(android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                | android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                | android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                | android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                | android.view.View.SYSTEM_UI_FLAG_FULLSCREEN
+                | android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) applyEdgeToEdge();
     }
 
     /* Why the previous run ended (crash, low memory kill, ...), kept in

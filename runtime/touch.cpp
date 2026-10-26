@@ -902,6 +902,103 @@ extern "C" void f_524860(CPU *c) {
 }
 
 #endif
+#ifdef GAME_USM
+// Fullscreen: the game lays out and hit-tests its UI in the resolution stored
+// in pcconfig.txt (800x600, 4:3 on a stock install) and the client rect now
+// follows the back buffer (pp_sync_client in d3d9_bridge.cpp), so that stored
+// resolution is what dxvk stretches across the screen. Rewriting it to the
+// display size (and "Widescreen" to the engine's "From Screen-Res" value, 3)
+// lets the game render native instead of stretched. Keys are only rewritten
+// when they exist: a pcconfig.txt that names them differently is logged and
+// left alone, and the stretch path fills the screen regardless.
+static bool find_file_ci(const std::string &dir, const char *name, std::string &out, int depth) {
+    DIR *d = opendir(dir.c_str());
+    if (!d) return false;
+    bool hit = false;
+    while (struct dirent *de = readdir(d)) {
+        if (de->d_name[0] == '.') continue;
+        std::string p = dir + "/" + de->d_name;
+        if (!strcasecmp(de->d_name, name)) { out = p; hit = true; break; }
+        struct stat st;
+        if (depth > 0 && stat(p.c_str(), &st) == 0 && S_ISDIR(st.st_mode) &&
+            strcasecmp(de->d_name, "CachedShaders") && find_file_ci(p, name, out, depth - 1)) { hit = true; break; }
+    }
+    closedir(d);
+    return hit;
+}
+
+static void usm_rewrite_pcconfig() {
+    std::string path;
+    if (!find_file_ci(g_game_dir, "pcconfig.txt", path, 2) &&
+        !find_file_ci(g_save_dir, "pcconfig.txt", path, 4)) {
+        LOG("fullscreen: no pcconfig.txt yet (first run sizes itself from the display mode)");
+        return;
+    }
+    FILE *f = fopen(path.c_str(), "rb");
+    if (!f) return;
+    std::string text;
+    char buf[4096];
+    size_t n;
+    while ((n = fread(buf, 1, sizeof buf, f)) > 0) text.append(buf, n);
+    fclose(f);
+
+    int dw = 0, dh = 0;
+    SDL_DisplayMode dm;
+    if (SDL_GetDesktopDisplayMode(0, &dm) == 0) { dw = dm.w; dh = dm.h; }
+    if (dw <= 0 || dh <= 0) platform_window_size(&dw, &dh);
+    char res_w[16], res_h[16];
+    snprintf(res_w, sizeof res_w, "%d", dw > 0 ? dw : 2285);
+    snprintf(res_h, sizeof res_h, "%d", dh > 0 ? dh : 1080);
+
+    static const struct { const char *key, *value; } k_keys[] = {
+        {"ScreenWidth", res_w}, {"ScreenHeight", res_h}, {"Widescreen", "3"},
+    };
+    std::string out, keys_seen;
+    size_t pos = 0;
+    int changed = 0;
+    while (pos < text.size()) {
+        size_t e = text.find('\n', pos);
+        std::string line = text.substr(pos, e == std::string::npos ? std::string::npos : e - pos);
+        pos = e == std::string::npos ? text.size() : e + 1;
+        size_t k0 = line.find_first_not_of(" \t"), k1 = k0 == std::string::npos ? std::string::npos : line.find_first_of(" \t=", k0);
+        if (k0 != std::string::npos && k1 != std::string::npos) {
+            std::string key = line.substr(k0, k1 - k0);
+            if (!keys_seen.empty()) keys_seen += ' ';
+            keys_seen += key;
+            for (const auto &k : k_keys)
+                if (!strcasecmp(key.c_str(), k.key)) {
+                    size_t v0 = line.find_first_not_of(" \t=", k1);
+                    size_t v1 = v0 == std::string::npos ? std::string::npos : line.find_first_of(" \t\r", v0);
+                    std::string tail = v1 == std::string::npos ? (line.size() && line.back() == '\r' ? "\r" : "") : line.substr(v1);
+                    std::string newline = line.substr(0, v0 == std::string::npos ? line.size() : v0) + k.value + tail;
+                    if (newline != line) {
+                        LOG("fullscreen: pcconfig %s: %s -> %s", k.key, line.c_str(), newline.c_str());
+                        line = newline;
+                        changed++;
+                    }
+                }
+        }
+        out += line;
+        if (e != std::string::npos) out += '\n';
+    }
+    LOG("fullscreen: %s keys: %s (%d rewritten)", path.c_str(), keys_seen.c_str(), changed);
+    if (changed) {
+        /* keep the original beside it, once: if the game rejects a rewritten
+         * value, restoring is a rename away */
+        std::string bak = path + "_port.bak";
+        struct stat st;
+        if (stat(bak.c_str(), &st) != 0 && (f = fopen(bak.c_str(), "wb"))) {
+            fwrite(text.data(), 1, text.size(), f);
+            fclose(f);
+            LOG("fullscreen: original kept as %s", bak.c_str());
+        }
+    }
+    if (changed && (f = fopen(path.c_str(), "wb"))) {
+        fwrite(out.data(), 1, out.size(), f);
+        fclose(f);
+    }
+}
+#endif
 extern "C" void touch_setup_guest(void) {
 #ifdef GAME_MARVEL
     load_cfg_marvel();
@@ -919,7 +1016,10 @@ extern "C" void touch_setup_guest(void) {
 #endif
 #ifdef GAME_USM
     /* Ultimate Spider-Man: no menu hooks yet. The Android launcher writes
-     * touch.cfg ("<touch> <nintendo>"), exactly as for Skyrim. */
+     * touch.cfg ("<touch> <nintendo>"), exactly as for Skyrim. This runs
+     * before the game's entry point, so the pcconfig rewrite lands before
+     * the game parses the file. */
+    usm_rewrite_pcconfig();
     if (FILE *f = fopen(cfg_path().c_str(), "r")) {
         int t = 1, n = 0;
         if (fscanf(f, "%d %d", &t, &n) >= 1) { g_touch_on = t != 0; g_nintendo = n != 0; }

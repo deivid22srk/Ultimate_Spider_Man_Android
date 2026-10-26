@@ -260,7 +260,10 @@ SHIM(di_EnumDevices) {
             uint8_t inst[16] = {0x10 + i, 0x4C, 0xB0, 0x1B, 0, 0, 0, 0, 'L', 'B', 'P', 'A', 'D', 0, 0, 0};
             go = enum_one(c, cb, ref, inst, 0x10215, "Controller (XBOX 360 For Windows)");
         }
-        LOG("DirectInput: listed %d XInput pad(s)", n);
+        {   /* the game enumerates every frame; log only when the count changes */
+            static int last_n = -1;
+            if (n != last_n) { last_n = n; LOG("DirectInput: listed %d XInput pad(s)", n); }
+        }
     }
     RET(0, 5);
 }
