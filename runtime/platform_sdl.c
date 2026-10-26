@@ -15,6 +15,23 @@ void platform_init(void) {
     SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER | SDL_INIT_EVENTS) != 0)
         rt_fatal("SDL_Init: %s", SDL_GetError());
+#ifdef __ANDROID__
+    /* Custom GPU driver, if the launcher picked one. Before this point SDL has
+     * no video device to hand the loader to; after it, nothing has touched
+     * Vulkan yet, which is the window where both the renderer and the surface
+     * can still be pointed at the same loader. */
+    {
+        extern int usm_driver_open(const char *, const char *, void **, void **);
+        extern void dxvk_vulkan_set_get_instance_proc_addr(void *);
+        extern void SDL_Vulkan_SetExternalLoader(void *, void *);
+        extern char g_driver_dir[1024], g_native_lib_dir[1024];
+        void *drv = NULL, *gipa = NULL;
+        if (usm_driver_open(g_driver_dir, g_native_lib_dir, &drv, &gipa)) {
+            dxvk_vulkan_set_get_instance_proc_addr(gipa);
+            SDL_Vulkan_SetExternalLoader(drv, gipa);
+        }
+    }
+#endif
     int w = 1280, h = 720;
     Uint32 flags = SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN;
     if (getenv("LB_WINDOW")) sscanf(getenv("LB_WINDOW"), "%dx%d", &w, &h);  /* desktop testing */

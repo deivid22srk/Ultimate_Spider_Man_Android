@@ -208,6 +208,27 @@ extern DECLSPEC SDL_bool SDLCALL SDL_Vulkan_CreateSurface(SDL_Window *window,
 extern DECLSPEC void SDLCALL SDL_Vulkan_GetDrawableSize(SDL_Window * window,
                                                         int *w, int *h);
 
+/**
+ * \brief Hand SDL a Vulkan loader it did not open itself
+ *
+ * The Android backend normally dlopen()s "libvulkan.so" on the first
+ * SDL_Vulkan_CreateSurface. When the app loads its own loader instead (a custom
+ * GPU driver via libadrenotools), SDL would open a second, different loader and
+ * the surface would not belong to the instance the app created.
+ *
+ * Pass the handle that loader was opened with and its vkGetInstanceProcAddr;
+ * SDL then uses them for extension queries and surface creation and will not
+ * unload the handle on exit.
+ *
+ * \param handle the loader handle, only used as the "is loaded" flag and for
+ *               SDL_Vulkan_UnloadLibrary bookkeeping
+ * \param vkGetInstanceProcAddr vkGetInstanceProcAddr of that loader
+ *
+ * \since This function is Android specific and not part of upstream SDL.
+ */
+extern DECLSPEC void SDLCALL SDL_Vulkan_SetExternalLoader(void *handle,
+                                                          void *vkGetInstanceProcAddr);
+
 /* @} *//* Vulkan support functions */
 
 /* Ends C function definitions when using C++ */

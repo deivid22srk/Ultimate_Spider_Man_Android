@@ -10,4 +10,9 @@ set(SDL_STATIC OFF CACHE BOOL "" FORCE)
 set(SDL_TEST OFF CACHE BOOL "" FORCE)
 add_subdirectory(SDL2)
 add_subdirectory(dxvk)
+if(ANDROID)
+    # Custom GPU drivers: opens the system loader with a user supplied
+    # libvulkan.so swapped in (BSD-2-Clause, vendored under adrenotools/).
+    add_subdirectory(adrenotools)
+endif()
 add_subdirectory(game)

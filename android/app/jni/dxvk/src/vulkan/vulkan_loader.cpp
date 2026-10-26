@@ -2,7 +2,16 @@
 
 namespace dxvk::vk {
 
-  static const PFN_vkGetInstanceProcAddr GetInstanceProcAddr = vkGetInstanceProcAddr;
+  /* Everything DXVK does with Vulkan goes through this one pointer (no direct
+   * vk* calls anywhere else in the tree), so pointing it at a loader that was
+   * opened with a custom GPU driver is enough to move the whole renderer onto
+   * that driver. Defaults to the loader the binary links against. */
+  static PFN_vkGetInstanceProcAddr GetInstanceProcAddr = vkGetInstanceProcAddr;
+
+  extern "C" void dxvk_vulkan_set_get_instance_proc_addr(void *pfn) {
+    if (pfn)
+      GetInstanceProcAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(pfn);
+  }
 
   PFN_vkVoidFunction LibraryLoader::sym(const char* name) const {
     return dxvk::vk::GetInstanceProcAddr(nullptr, name);

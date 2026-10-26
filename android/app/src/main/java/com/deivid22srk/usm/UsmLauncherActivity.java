@@ -60,7 +60,7 @@ import java.util.Map;
  * GradientDrawable/RippleDrawable shapes, and nothing here can drift out of
  * sync with an XML file. */
 public class UsmLauncherActivity extends Activity {
-    private static final int REQ_FOLDER = 1, REQ_PERM = 2;
+    private static final int REQ_FOLDER = 1, REQ_PERM = 2, REQ_DRIVER = 3;
 
     /* The recompilation uses fixed addresses: it only works with this build.
      * USM.exe 1.0.0.1, Treyarch, 5,926,912 bytes. */
@@ -495,6 +495,39 @@ public class UsmLauncherActivity extends Activity {
         rlp.leftMargin = dp(12);
         cards.addView(right, rlp);
 
+        /* full width card: which Vulkan driver the game runs on */
+        LinearLayout drv = card();
+        sectionTitle(drv, "DRIVER DE GPU");
+        drv.addView(tv("Vulkan", 15, TEXT, medium));
+        TextView dsub = tv("Sistema usa o driver da Qualcomm. Um driver importado (Turnip) é usado "
+                + "no lugar dele — resolve bugs e às vezes destrava o jogo em Adreno. arm64.", 11, MUTED, regular);
+        dsub.setLineSpacing(dp(2), 1f);
+        LinearLayout.LayoutParams dsubp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        dsubp.topMargin = dp(3);
+        drv.addView(dsub, dsubp);
+
+        driverList = new LinearLayout(this);
+        driverList.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        dlp.topMargin = dp(8);
+        drv.addView(driverList, dlp);
+
+        TextView imp = tv("IMPORTAR DRIVER (.ZIP)", 11, TEXT, medium);
+        imp.setLetterSpacing(0.10f);
+        imp.setGravity(Gravity.CENTER);
+        imp.setBackground(press(shape(0x0DFFFFFF, 100, 0x33FFFFFF, 1.2f)));
+        tap(imp, this::importDriver);
+        LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(42));
+        ilp.topMargin = dp(10);
+        drv.addView(imp, ilp);
+
+        LinearLayout.LayoutParams drvp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        drvp.topMargin = dp(12);
+        col.addView(drv, drvp);
+
         ScrollView sv = new ScrollView(this);
         sv.setVerticalScrollBarEnabled(false);
         sv.setFillViewport(true);
@@ -502,6 +535,7 @@ public class UsmLauncherActivity extends Activity {
          * the cards would be clipped instead of scrolling on a short screen */
         sv.addView(col, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT));
+        refreshDrivers();
         return sv;
     }
 
@@ -670,6 +704,10 @@ public class UsmLauncherActivity extends Activity {
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
+        if (req == REQ_DRIVER) {
+            if (res == RESULT_OK && data != null && data.getData() != null) unpackDriver(data.getData());
+            return;
+        }
         if (req != REQ_FOLDER || res != RESULT_OK || data == null || data.getData() == null) return;
         String path = treeToPath(data.getData());
         if (path == null) {
@@ -806,6 +844,223 @@ public class UsmLauncherActivity extends Activity {
         }
     }
 
+    /* ---- GPU driver ------------------------------------------------- */
+
+    /* Drivers live in the app's private storage: dlopen() from internal data is
+     * allowed, dlopen() from shared storage is not, and libadrenotools needs to
+     * dlopen the user's libvulkan.so. */
+    private File driversDir() {
+        File d = new File(getFilesDir(), "drivers");
+        d.mkdirs();
+        return d;
+    }
+
+    private String driverChoice() {
+        return prefs.getString("driver", "system");
+    }
+
+    private String driverPath() {
+        String c = driverChoice();
+        if (c.isEmpty() || c.equals("system")) return "";
+        File d = new File(driversDir(), c);
+        return new File(d, "libvulkan.so").exists() ? d.getAbsolutePath() : "";
+    }
+
+    private java.util.List<String> installedDrivers() {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        File[] fs = driversDir().listFiles();
+        if (fs == null) return out;
+        for (File f : fs)
+            if (f.isDirectory() && new File(f, "libvulkan.so").exists()) out.add(f.getName());
+        java.util.Collections.sort(out);
+        return out;
+    }
+
+    private void refreshDrivers() {
+        if (driverList == null) return;
+        driverList.removeAllViews();
+        driverList.addView(driverRow("system", "Sistema (Qualcomm)", driverChoice().equals("system"), false));
+        for (String n : installedDrivers()) {
+            divider(driverList);
+            driverList.addView(driverRow(n, n, driverChoice().equals(n), true));
+        }
+    }
+
+    private View driverRow(String key, String label, boolean selected, boolean removable) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(0, dp(10), 0, dp(10));
+
+        View dot = new View(this);
+        dot.setBackground(selected ? dot(0xFFF15A5A, 0xFFF15A5A) : dot(0x00000000, 0xFF3E4452));
+        row.addView(dot, new LinearLayout.LayoutParams(dp(14), dp(14)));
+
+        TextView t = tv(label, 14, selected ? TEXT : 0xFFC6CBD6, medium);
+        LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        tlp.leftMargin = dp(12);
+        row.addView(t, tlp);
+
+        if (removable) {
+            TextView del = tv("REMOVER", 9, MUTED, medium);
+            del.setLetterSpacing(0.12f);
+            del.setPadding(dp(10), dp(6), dp(10), dp(6));
+            tap(del, () -> deleteDriver(key));
+            row.addView(del);
+        }
+        tap(row, () -> {
+            prefs.edit().putString("driver", key).apply();
+            refreshDrivers();
+        });
+        return row;
+    }
+
+    private android.graphics.drawable.GradientDrawable dot(int fill, int stroke) {
+        android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable();
+        g.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        g.setColor(fill);
+        g.setStroke(dp(1.4f), stroke);
+        return g;
+    }
+
+    private void importDriver() {
+        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        i.setType("*/*");
+        i.putExtra(Intent.EXTRA_MIME_TYPES,
+                new String[] { "application/zip", "application/x-zip-compressed" });
+        try {
+            startActivityForResult(i, REQ_DRIVER);
+        } catch (ActivityNotFoundException e) {
+            Toast.makeText(this, "Nenhum gerenciador de arquivos encontrado", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private String displayName(Uri uri) {
+        try (android.database.Cursor c = getContentResolver().query(uri, null, null, null, null)) {
+            if (c != null && c.moveToFirst()) {
+                int i = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME);
+                if (i >= 0) return c.getString(i);
+            }
+        } catch (Exception ignored) {
+        }
+        String p = uri.getLastPathSegment();
+        return p == null ? "driver" : p;
+    }
+
+    private static String slug(String name) {
+        String n = name == null ? "driver" : name;
+        if (n.toLowerCase().endsWith(".zip")) n = n.substring(0, n.length() - 4);
+        n = n.replaceAll("[^A-Za-z0-9._-]", "-").replaceAll("-{2,}", "-");
+        if (n.isEmpty() || n.equals(".") || n.equals("..")) n = "driver";
+        return n.length() > 40 ? n.substring(0, 40) : n;
+    }
+
+    /* The pack is a zip with libvulkan.so somewhere inside (usually at the top,
+     * sometimes in a folder). Extract out of the UI thread and only then look
+     * for the library, so a broken or huge archive cannot lock the launcher. */
+    private void unpackDriver(final Uri uri) {
+        final String label = displayName(uri);
+        new Thread(() -> {
+            File tmp = new File(getCacheDir(), "driver-import");
+            deleteRecursive(tmp);
+            tmp.mkdirs();
+            String err = null;
+            int files = 0;
+            try (java.io.InputStream in = getContentResolver().openInputStream(uri);
+                 java.util.zip.ZipInputStream z = new java.util.zip.ZipInputStream(in)) {
+                if (z == null || in == null) throw new java.io.IOException("não foi possível abrir o arquivo");
+                byte[] buf = new byte[1 << 16];
+                java.util.zip.ZipEntry e;
+                while ((e = z.getNextEntry()) != null) {
+                    String n = e.getName().replace('\\', '/');
+                    if (n.startsWith("/") || n.contains("..")) continue;
+                    File out = new File(tmp, n);
+                    if (e.isDirectory()) { out.mkdirs(); continue; }
+                    File parent = out.getParentFile();
+                    if (parent != null) parent.mkdirs();
+                    try (java.io.FileOutputStream fo = new java.io.FileOutputStream(out)) {
+                        int r;
+                        while ((r = z.read(buf)) > 0) fo.write(buf, 0, r);
+                    }
+                    files++;
+                }
+            } catch (Exception ex) {
+                err = ex.toString();
+            }
+
+            File lib = err == null ? findVulkanLib(tmp, 3) : null;
+            if (err == null && lib == null) err = "o ZIP não tem libvulkan.so";
+
+            final String ferr = err;
+            final File flib = lib;
+            final int nfiles = files;
+            runOnUiThread(() -> {
+                if (ferr != null) {
+                    Toast.makeText(this, "Importação falhou: " + ferr, Toast.LENGTH_LONG).show();
+                    return;
+                }
+                File src = flib.getParentFile();
+                String name = slug(label);
+                File dst = new File(driversDir(), name);
+                for (int i = 2; dst.exists(); i++) dst = new File(driversDir(), name + "-" + i);
+                if (!src.renameTo(dst) && !copyTree(src, dst)) {
+                    Toast.makeText(this, "Não foi possível gravar em " + dst, Toast.LENGTH_LONG).show();
+                    return;
+                }
+                deleteRecursive(tmp);
+                prefs.edit().putString("driver", dst.getName()).apply();
+                refreshDrivers();
+                Toast.makeText(this, "Driver " + dst.getName() + " importado (" + nfiles
+                        + " arquivos). Vale no próximo JOGAR.", Toast.LENGTH_LONG).show();
+            });
+        }).start();
+    }
+
+    private static File findVulkanLib(File dir, int depth) {
+        File[] fs = dir.listFiles();
+        if (fs == null || depth < 0) return null;
+        for (File f : fs) if (f.isFile() && f.getName().equals("libvulkan.so")) return f;
+        for (File f : fs) {
+            if (!f.isDirectory()) continue;
+            File r = findVulkanLib(f, depth - 1);
+            if (r != null) return r;
+        }
+        return null;
+    }
+
+    private static boolean copyTree(File src, File dst) {
+        try {
+            if (src.isDirectory()) {
+                dst.mkdirs();
+                File[] fs = src.listFiles();
+                if (fs != null) for (File f : fs) if (!copyTree(f, new File(dst, f.getName()))) return false;
+                return true;
+            }
+            try (java.io.InputStream in = new java.io.FileInputStream(src);
+                 java.io.OutputStream out = new java.io.FileOutputStream(dst)) {
+                byte[] b = new byte[1 << 16];
+                int n;
+                while ((n = in.read(b)) > 0) out.write(b, 0, n);
+            }
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private static void deleteRecursive(File f) {
+        File[] fs = f.listFiles();
+        if (fs != null) for (File c : fs) deleteRecursive(c);
+        f.delete();
+    }
+
+    private void deleteDriver(String name) {
+        deleteRecursive(new File(driversDir(), name));
+        if (driverChoice().equals(name)) prefs.edit().putString("driver", "system").apply();
+        refreshDrivers();
+    }
+
     private void play() {
         if (!hasStorage()) { pendingPlay = true; requestStorage(); return; }
         if (!checkFolder(prefs.getString("folder", null)).isEmpty()) { showScreen(false); refreshFolder(); return; }
@@ -846,6 +1101,7 @@ public class UsmLauncherActivity extends Activity {
         }
         Intent i = new Intent(this, UsmActivity.class);
         i.putExtra("game", folder);
+        i.putExtra("driver", driverPath());
         startActivity(i);
         finish();
     }

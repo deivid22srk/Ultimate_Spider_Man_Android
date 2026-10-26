@@ -16,11 +16,19 @@ public class UsmActivity extends SDLActivity {
         return new String[] { "SDL2", "dxvk_d3d9", "main" };
     }
 
-    /* argv[1] = game folder, argv[2] = save folder, from the launcher. */
+    /* argv[1] = game folder, argv[2] = folder with the user's libvulkan.so ("" for
+     * the system driver), argv[3] = nativeLibraryDir, where libadrenotools' hook
+     * libraries live. The last one has to be passed in: libadrenotools builds a
+     * linker namespace rooted there. */
     @Override
     protected String[] getArguments() {
         String game = getIntent().getStringExtra("game");
-        return game == null ? new String[0] : new String[] { game };
+        if (game == null) return new String[0];
+        String driver = getIntent().getStringExtra("driver");
+        return new String[] {
+                game,
+                driver == null ? "" : driver,
+                getApplicationInfo().nativeLibraryDir };
     }
 
     @Override

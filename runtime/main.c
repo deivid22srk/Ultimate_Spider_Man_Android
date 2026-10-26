@@ -413,6 +413,12 @@ static void check_game_dir(void) {
         rt_fatal("missing from %s: %s (the DLLs may also sit in a redist subfolder)", g_game_dir, missing);
 }
 
+/* Set by the launcher through argv (see UsmActivity.getArguments): the folder of
+ * a user supplied libvulkan.so, empty for the system driver, and the APK's
+ * native library dir, where libadrenotools' hook libraries live. */
+char g_driver_dir[1024];
+char g_native_lib_dir[1024];
+
 int main(int argc, char **argv) {
     install_crash_handler();
     const char *env = getenv("LB_LOG");
@@ -423,6 +429,8 @@ int main(int argc, char **argv) {
      * Without it, the app's external files folder is used as before. */
     {
         char base[1024] = "";
+        if (argc > 2) snprintf(g_driver_dir, sizeof g_driver_dir, "%s", argv[2]);
+        if (argc > 3) snprintf(g_native_lib_dir, sizeof g_native_lib_dir, "%s", argv[3]);
         if (argc > 1) {
             snprintf(g_game_dir, sizeof g_game_dir, "%s", argv[1]);
             snprintf(base, sizeof base, "%s/port", argv[1]);
