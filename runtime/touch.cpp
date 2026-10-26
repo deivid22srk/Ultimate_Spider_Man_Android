@@ -116,9 +116,9 @@ bool g_hud_menu_last;
 
 // Menu = the game is showing its cursor (ShowCursor count >= 0 while it
 // drives menus with the system cursor). Only used when g_hud_ctx is on.
+extern "C" int user32_cursor_visible(void);
 bool hud_menu() {
 #ifdef GAME_USM
-    extern "C" int user32_cursor_visible(void);
     bool m = user32_cursor_visible() != 0;
     if (m != g_hud_menu_last) {
         g_hud_menu_last = m;
