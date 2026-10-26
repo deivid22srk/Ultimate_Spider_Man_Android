@@ -532,6 +532,23 @@ static uint32_t guest_str(const char *s) {
     return g;
 }
 
+// case-insensitive file search under dir, at most depth levels deep
+static bool find_ci(const std::string &dir, const char *name, std::string &out, int depth) {
+    DIR *d = opendir(dir.c_str());
+    if (!d) return false;
+    bool hit = false;
+    while (struct dirent *de = readdir(d)) {
+        if (de->d_name[0] == '.') continue;
+        std::string p = dir + "/" + de->d_name;
+        if (!strcasecmp(de->d_name, name)) { out = p; hit = true; break; }
+        struct stat st;
+        if (depth > 0 && stat(p.c_str(), &st) == 0 && S_ISDIR(st.st_mode) &&
+            strcasecmp(de->d_name, "CachedShaders") && find_ci(p, name, out, depth - 1)) { hit = true; break; }
+    }
+    closedir(d);
+    return hit;
+}
+
 #ifdef GAME_MARVEL
 // Video Settings in LEGO Marvel (widget menu at 0x8E9F60 / input 0x8E31B0).
 // The display mode object at 0x1952470 holds the mode list (+0x1B8, 16-byte
@@ -671,22 +688,6 @@ static const struct { const char *key; int value; } k_low_cfg[] = {
     {"LensFilterEnabled", 0}, {"RingEffectEnabled", 0}, {"ScreenSpaceReflectionsEnabled", 0},
     {"EdgeHightlightEnabled", 0}, {"AllowVendorExtensions", 0}, {"IgnoreVendorPresets", 1},
 };
-
-static bool find_ci(const std::string &dir, const char *name, std::string &out, int depth) {
-    DIR *d = opendir(dir.c_str());
-    if (!d) return false;
-    bool hit = false;
-    while (struct dirent *de = readdir(d)) {
-        if (de->d_name[0] == '.') continue;
-        std::string p = dir + "/" + de->d_name;
-        if (!strcasecmp(de->d_name, name)) { out = p; hit = true; break; }
-        struct stat st;
-        if (depth > 0 && stat(p.c_str(), &st) == 0 && S_ISDIR(st.st_mode) &&
-            strcasecmp(de->d_name, "CachedShaders") && find_ci(p, name, out, depth - 1)) { hit = true; break; }
-    }
-    closedir(d);
-    return hit;
-}
 
 static void rewrite_pcconfig_low() {
     std::string path;
@@ -926,6 +927,23 @@ extern "C" void touch_setup_guest(void) {
         fclose(f);
     }
     input_set_nintendo(g_nintendo);
+    {   /* diagnostics: pcconfig.txt holds this game's resolution and aspect
+         * ratio; log its keys once, so a run's log.txt shows exactly which
+         * of them this build could force (the display sync in d3d9_bridge
+         * moves the game's own globals instead, whatever the keys are). */
+        std::string path;
+        if (!find_ci(g_save_dir, "pcconfig.txt", path, 6)) { LOG("pcconfig: not found yet"); return; }
+        if (FILE *f = fopen(path.c_str(), "rb")) {
+            char line[128];
+            LOG("pcconfig: %s", path.c_str());
+            for (int i = 0; i < 40 && fgets(line, sizeof line, f); i++) {
+                size_t l = strlen(line);
+                while (l && (line[l - 1] == '\n' || line[l - 1] == '\r')) line[--l] = 0;
+                if (l) LOG("pcconfig: %s", line);
+            }
+            fclose(f);
+        }
+    }
     return;
 #endif
     if (!available()) return;
