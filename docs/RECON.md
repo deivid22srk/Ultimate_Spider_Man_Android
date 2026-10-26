@@ -369,11 +369,14 @@ hint (`hud_campad`) is drawn only while a finger is dragging in the camera
 zone, and the pointer art (`hud_cursor`) only for 1.5 s after a pointer
 gesture.
 
-The struggle button (`hud_mash.png`, always on screen, never hidden by the
-contextual HUD) alternates ThrowWeb and Jump every 70 ms while it is held. The
-game's grab QTEs — Venom absorbing you is the one that shows up most — want
-exactly that pair pressed in rapid alternation, which two buttons tapped by hand
-cannot reproduce reliably; the touch layer presses them for the player. Swapping the whole HUD by game state (menus vs gameplay vs cutscene)
+The confirm button (`hud_ok.png`, always on screen, never hidden by the
+contextual HUD) sends **Enter alone** through an overlay-only bit (`0x0040`).
+Every menu in this game is keyboard driven: the highlight moves with the arrows
+(the stick presses those) and Enter selects, while Space is "resume" — the pause
+screen says `PRESS "SPACE" TO RESUME`. Because A also presses Space, A can never
+confirm anything in a menu, and no other button sent Enter, which is why the
+pause menu could not reach Options. In the contextual HUD the menu set is now
+Start only, so A cannot close the menu by accident. Swapping the whole HUD by game state (menus vs gameplay vs cutscene)
 is **not** implemented — none of the signals it needs (the front-end level
 pointer, Bink playback, a meaningful `ClipCursor`/`ShowCursor` change) is
 wired up yet.

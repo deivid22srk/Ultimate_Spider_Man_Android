@@ -151,6 +151,10 @@ static const struct { uint16_t bit; uint8_t dik, vk; } k_usm_keys[] = {
     {0x0200, 0x2F, 0x56}, /* RB -> V: black button */
     {0x0010, 0x01, 0x1B}, /* Start -> Esc: pause */
     {0x0020, 0x32, 0x4D}, /* Back -> M */
+    /* Overlay only: the OK button. Nothing else uses the left-thumb bit, and
+     * Enter on its own is what the menus confirm with -- A also presses Space,
+     * which the pause screen takes as "resume" and never as "select". */
+    {0x0040, 0x1C, 0x0D}, /* OK -> Enter */
 };
 /* stick directions press both the letter and the arrow the game binds */
 static const struct { int axis, sign; uint8_t dik, vk; } k_usm_stick[] = {

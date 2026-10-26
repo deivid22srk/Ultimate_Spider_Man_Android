@@ -39,15 +39,16 @@ const int NB = sizeof k_buttons / sizeof k_buttons[0];
 const float STICK_X = 0.24f, STICK_Y = -0.26f, STICK_R = 0.17f; // from bottom-left
 // the camera zone has no widget, only this hint, shown while a finger drags
 const float CAMPAD_X = 0.70f, CAMPAD_Y = 0.44f, CAMPAD_R = 0.17f; // from top-left
-/* Struggle button. The game's grabs (Venom absorbing you and the like) want the
- * two web actions pressed in quick alternation -- the PC walkthrough's "rapidly
- * press the web attack and web swing buttons to break free". Two buttons tapped
- * by hand on glass cannot hold that rhythm, so this one alternates for the
- * player while it is held: ThrowWeb (C) and Jump/Swing (Space), one every 70 ms. */
-const float MASH_X = 0.44f, MASH_Y = 0.86f, MASH_R = 0.072f;
-bool g_mash;
+/* Confirm button. Every menu in this game is keyboard driven: the list highlight
+ * moves with the arrows (the stick already sends those) and Enter selects, while
+ * Space is reserved for "resume" -- the pause screen literally says PRESS
+ * "SPACE" TO RESUME. A therefore cannot confirm anything, it un-pauses, and no
+ * other button sends Enter. This one does, and nothing else: in gameplay Enter
+ * is unbound, so it is inert there. */
+const float OK_X = 0.44f, OK_Y = 0.86f, OK_R = 0.072f;
+bool g_ok;
 
-struct Finger { SDL_FingerID id; int button; bool stick; bool look; bool ptr, mash; float x, y; bool used; };
+struct Finger { SDL_FingerID id; int button; bool stick; bool look; bool ptr, ok; float x, y; bool used; };
 Finger g_fingers[10];
 float g_stick_x, g_stick_y;   // knob offset, -1..1
 bool g_available, g_decided, g_seen, g_was_on;
@@ -185,7 +186,12 @@ void hud_probe() {
 bool button_shown(int i) {
     if (!g_hud_ctx) return true;
     if (!g_hud_menu) return true;
-    return strcmp(k_buttons[i].name, "A") == 0 || strcmp(k_buttons[i].name, "Start") == 0;
+    /* Menus: only Start stays. The list is walked with the stick (it presses the
+     * arrows) and confirmed with the OK button, which is drawn outside this set
+     * and is therefore always there. A is excluded on purpose -- it also presses
+     * Space, and Space is "resume" on the pause screen, so offering it in a menu
+     * means the menu closes instead of opening Options. */
+    return strcmp(k_buttons[i].name, "Start") == 0;
 }
 
 int hit_button(float x, float y) {
@@ -199,18 +205,18 @@ int hit_button(float x, float y) {
     return -1;
 }
 
-bool hit_mash(float x, float y) {
-    float dx = (x - MASH_X) * g_aspect, dy = y - MASH_Y, r = MASH_R * 1.25f;
+bool hit_ok(float x, float y) {
+    float dx = (x - OK_X) * g_aspect, dy = y - OK_Y, r = OK_R * 1.25f;
     return dx * dx + dy * dy < r * r;
 }
 
 void update() {
     uint16_t b = 0;
     float sx = 0, sy = 0;
-    bool mash = false;
+    bool ok = false;
     for (auto &f : g_fingers) {
         if (!f.used) continue;
-        if (f.mash) { mash = true; continue; }
+        if (f.ok) { ok = true; continue; }
         if (f.stick) {
             float cx, cy;
             stick_pos(&cx, &cy);
@@ -227,10 +233,9 @@ void update() {
             if (f.button >= 0) b |= k_buttons[f.button].bit;
         }
     }
-    /* Alternating presses while the struggle button is held: 0x2000 is B (C,
-     * throw web) and 0x1000 is A (Space, jump/swing) in input.c's k_usm_keys. */
-    if (mash) b |= (SDL_GetTicks() / 70) % 2 ? 0x1000 : 0x2000;
-    g_mash = mash;
+    /* 0x0040 is the overlay-only bit that input.c maps to Enter alone. */
+    if (ok) b |= 0x0040;
+    g_ok = ok;
     g_buttons = b;
     g_stick_x = sx;
     g_stick_y = sy;
@@ -274,17 +279,17 @@ extern "C" void touch_handle_event(const SDL_Event *e) {
         if (!f) return;
         f->used = true;
         f->id = id;
-        f->mash = hit_mash(x, y);
-        f->button = f->mash ? -1 : hit_button(x, y);
+        f->ok = hit_ok(x, y);
+        f->button = f->ok ? -1 : hit_button(x, y);
         f->ptr = false;
         // anything on the left half that is not a button drives the stick
-        f->stick = !f->mash && f->button < 0 && x < 0.5f;
+        f->stick = !f->ok && f->button < 0 && x < 0.5f;
 #ifdef GAME_USM
         /* USM has no pad support: the overlay presses keys, and a finger on
          * the right half drags the camera (the game reads the mouse). */
-        f->stick = !f->mash && f->button < 0 && x < 0.45f;
-        f->look = !f->mash && f->button < 0 && x >= 0.45f;
-        f->ptr = !f->mash && f->button < 0;
+        f->stick = !f->ok && f->button < 0 && x < 0.45f;
+        f->look = !f->ok && f->button < 0 && x >= 0.45f;
+        f->ptr = !f->ok && f->button < 0;
 #endif
     }
     if (!f) return;
@@ -616,12 +621,12 @@ void touch_draw(IDirect3DDevice9 *d) {
         d->SetTexture(0, it->tex);
         d->DrawPrimitiveUP(D3DPT_TRIANGLELIST, 2, q, sizeof(Vtx));
     }
-    {   /* Struggle button: its own icon, drawn after the buttons so it can never
-         * be hidden by the contextual HUD, and lit while it is doing the work. */
-        const IconTex *mi = icon("mash");
+    {   /* Confirm: drawn after the action buttons, so the contextual HUD can
+         * never hide the one control a menu needs. */
+        const IconTex *ci = icon("ok");
         Vtx q[6];
-        quad(q, MASH_X, MASH_Y, MASH_R * 1.06f, w, h, dim(g_mash ? 0xFFFFFFFF : 0xE2FFFFFF));
-        d->SetTexture(0, mi ? mi->tex : g_tex);
+        quad(q, OK_X, OK_Y, OK_R * 1.06f, w, h, dim(g_ok ? 0xFFFFFFFF : 0xE2FFFFFF));
+        d->SetTexture(0, ci ? ci->tex : g_tex);
         d->DrawPrimitiveUP(D3DPT_TRIANGLELIST, 2, q, sizeof(Vtx));
     }
     d->EndScene();

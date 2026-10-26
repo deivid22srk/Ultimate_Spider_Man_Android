@@ -18,7 +18,7 @@ static const char *k_files[] = {
     "hud_punch.png", "on/hud_punch_on.png", "hud_kick.png", "on/hud_kick_on.png",
     "hud_wallcrawl.png", "on/hud_wallcrawl_on.png", "hud_black.png", "on/hud_black_on.png",
     "hud_pause.png", "on/hud_pause_on.png", "hud_back.png", "on/hud_back_on.png",
-    "hud_mash.png",
+    "hud_ok.png",
     "hud_stick.png", "hud_stick_knob.png", "hud_campad.png", "hud_cursor.png",
     "hud_skip.png",
 };
