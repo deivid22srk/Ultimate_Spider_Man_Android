@@ -170,9 +170,14 @@ SHIM(SetCursor) { RET(0, 1); }
 SHIM(SetCursorPos) { user32_cursor_set((int)ARG(0), (int)ARG(1)); RET(1, 2); }
 /* real display counter: games loop "while (ShowCursor(FALSE) >= 0)" */
 static volatile int g_cursor_count = 0;
-SHIM(ShowCursor) { int n = ARG(0) ? __atomic_add_fetch(&g_cursor_count, 1, __ATOMIC_SEQ_CST) : __atomic_sub_fetch(&g_cursor_count, 1, __ATOMIC_SEQ_CST); RET((uint32_t)n, 1); }
+SHIM(ShowCursor) {
+    int n = ARG(0) ? __atomic_add_fetch(&g_cursor_count, 1, __ATOMIC_SEQ_CST) : __atomic_sub_fetch(&g_cursor_count, 1, __ATOMIC_SEQ_CST);
+    LOG("cursor: ShowCursor(%d) -> %d", (int)ARG(0), n);
+    RET((uint32_t)n, 1);
+}
 /* For the touch HUD's context: the game shows its system cursor for menus. */
 int user32_cursor_visible(void) { return __atomic_load_n(&g_cursor_count, __ATOMIC_SEQ_CST) >= 0; }
+int user32_cursor_count(void) { return __atomic_load_n(&g_cursor_count, __ATOMIC_SEQ_CST); }
 /* Counts GetCursorPos calls. The menus hit-test their widgets against the
  * cursor on every poll; gameplay reads the mouse device's relative axes
  * instead, so a rising count means "the UI is being driven". */

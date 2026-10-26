@@ -138,6 +138,24 @@ bool hud_menu() {
 #endif
 }
 
+#ifdef GAME_USM
+extern "C" int user32_cursor_count(void);
+/* Diagnostic while the contextual HUD is on: dump the candidate "which screen"
+ * signals once a second, so a log taken in a menu and one taken in gameplay
+ * can be compared and a real discriminator picked. */
+void hud_probe() {
+    static uint32_t last;
+    uint32_t now = SDL_GetTicks();
+    if (now - last < 1000) return;
+    last = now;
+    uint32_t w = M32(0x960894), lv = w >= 0x10000 ? M32(w + 0x12C) : 0;
+    if (lv < 0x10000) lv = M32(0xACA89C);
+    unsigned flags = lv >= 0x10000 ? M8(lv + 0x64) : 0;
+    LOG("touch: probe world=%08x level=%08x flags=%02x cursorshow=%d cursorreads=%u",
+        w, lv, flags, user32_cursor_count(), user32_cursor_reads());
+}
+#endif
+
 // Buttons shown in the current context. A: Enter (confirm). Start: Esc (back/pause).
 bool button_shown(int i) {
     if (!g_hud_ctx) return true;
@@ -442,6 +460,9 @@ void touch_draw(IDirect3DDevice9 *d) {
             LOG("touch: back buffer %ux%u, window %dx%d, aspect %.4f", desc.Width, desc.Height, pw, ph, (double)g_aspect);
         }
     }
+#ifdef GAME_USM
+    if (g_hud_ctx) hud_probe();
+#endif
     {   /* Opacity: full for 2.5 s after the last touch, then down to 30% over
          * half a second; any touch brings it straight back. */
         uint32_t idle = SDL_GetTicks() - g_touch_ms;
