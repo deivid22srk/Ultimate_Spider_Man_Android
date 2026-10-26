@@ -88,6 +88,7 @@ public class UsmLauncherActivity extends Activity {
     private boolean pendingPick, pendingPlay;  /* continue once the storage prompt is answered */
     private boolean sawUnreadable;             /* last checkFolder() hit a permission wall */
     private boolean askedAllFiles;
+    private LinearLayout driverList;            /* GPU driver rows, rebuilt on change */
 
     private Typeface black, medium, regular;
 
