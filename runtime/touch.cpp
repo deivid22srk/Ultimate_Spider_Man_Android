@@ -112,7 +112,11 @@ void stick_pos(float *x, float *y) {
 // Contextual HUD (opt-in: touch.cfg 5th field). Off keeps the classic HUD
 // exactly. On, the menus show only the buttons that do something there.
 bool g_hud_ctx;
-bool g_hud_menu_last;
+// The decision for the frame being drawn. hud_menu_step() runs once per frame
+// (from touch_draw): button_shown() is asked several times per frame -- once
+// per button while drawing, again on every hit test -- so counting there would
+// advance the hysteresis eight times per frame and latch almost immediately.
+bool g_hud_menu;
 
 extern "C" uint32_t d3d9_last_frame_draws(void);
 
@@ -128,15 +132,15 @@ extern "C" uint32_t d3d9_last_frame_draws(void);
 #ifndef HUD_MENU_DRAWS
 #define HUD_MENU_DRAWS 32   /* below this many draws a frame looks like a menu */
 #endif
-bool hud_menu() {
+bool hud_menu_step() {
 #ifdef GAME_USM
     static int low, high;
     uint32_t d = d3d9_last_frame_draws();
     if (d < HUD_MENU_DRAWS) { if (low < 21) low++; high = 0; }
     else { low = 0; if (high < 3) high++; }
-    bool m = g_hud_menu_last ? high < 2 : low >= 20;
-    if (m != g_hud_menu_last) {
-        g_hud_menu_last = m;
+    bool m = g_hud_menu ? high < 2 : low >= 20;
+    if (m != g_hud_menu) {
+        g_hud_menu = m;
         LOG("touch: HUD context -> %s (%u draws in the frame)", m ? "menu" : "game", d);
     }
     return m;
@@ -165,7 +169,7 @@ void hud_probe() {
     unsigned flags = lv >= 0x10000 ? M8(lv + 0x64) : 0;
     LOG("touch: probe draws %u..%u cursorshow=%d cursorreads=%u world=%08x level=%08x flags=%02x ctx=%s",
         lo, hi, user32_cursor_count(), user32_cursor_reads(), w, lv, flags,
-        g_hud_menu_last ? "menu" : "game");
+        g_hud_menu ? "menu" : "game");
     lo = ~0u; hi = 0;
 }
 #endif
@@ -173,7 +177,7 @@ void hud_probe() {
 // Buttons shown in the current context. A: Enter (confirm). Start: Esc (back/pause).
 bool button_shown(int i) {
     if (!g_hud_ctx) return true;
-    if (!hud_menu()) return true;
+    if (!g_hud_menu) return true;
     return strcmp(k_buttons[i].name, "A") == 0 || strcmp(k_buttons[i].name, "Start") == 0;
 }
 
@@ -475,7 +479,7 @@ void touch_draw(IDirect3DDevice9 *d) {
         }
     }
 #ifdef GAME_USM
-    if (g_hud_ctx) hud_probe();
+    if (g_hud_ctx) { hud_menu_step(); hud_probe(); }
 #endif
     {   /* Opacity: full for 2.5 s after the last touch, then down to 30% over
          * half a second; any touch brings it straight back. */
