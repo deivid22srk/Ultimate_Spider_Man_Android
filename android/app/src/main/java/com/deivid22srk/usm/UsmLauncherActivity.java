@@ -123,6 +123,7 @@ public class UsmLauncherActivity extends Activity {
         check(root, "vsync", "Vertical sync", true);
         check(root, "debuglog", "Debug log (verbose, slower)", false);
         check(root, "logoff", "No log file (turn logging off)", false);
+        check(root, "hudctx", "Contextual HUD (fewer buttons in menus)", false);
 
         playButton = new Button(this);
         playButton.setText("Play");
@@ -304,12 +305,14 @@ public class UsmLauncherActivity extends Activity {
             }
         }
         try (Writer w = new OutputStreamWriter(new FileOutputStream(cfg))) {
-            /* touch nintendo skip-cutscenes log-level (0 off, 1 normal, 2 debug) */
+            /* touch nintendo skip-cutscenes log-level contextual-hud
+             * (log: 0 off, 1 normal, 2 debug) */
             int logLevel = checks.get("logoff").isChecked() ? 0 : checks.get("debuglog").isChecked() ? 2 : 1;
             w.write((checks.get("touch").isChecked() ? "1" : "0") + " "
                     + (checks.get("nintendo").isChecked() ? "1" : "0") + " "
                     + skip + " "
-                    + logLevel + "\n");
+                    + logLevel + " "
+                    + (checks.get("hudctx").isChecked() ? "1" : "0") + "\n");
             try (Writer v = new OutputStreamWriter(new FileOutputStream(new File(save, "vsync.cfg")))) {
                 v.write(checks.get("vsync").isChecked() ? "1\n" : "0\n");
             }
