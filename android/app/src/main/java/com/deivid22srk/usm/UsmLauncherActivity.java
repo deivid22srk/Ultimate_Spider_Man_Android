@@ -25,6 +25,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.security.MessageDigest;
@@ -283,12 +284,48 @@ public class UsmLauncherActivity extends Activity {
         e.apply();
     }
 
+    /* The HUD icon pack ships inside the APK (assets/icons). The runtime opens
+     * it with plain file calls from <game>/port/icons, which the APK is not,
+     * so copy it out once per version. */
+    private void installIcons(File game) {
+        File dst = new File(game, "port/icons");
+        dst.mkdirs();
+        try {
+            String[] names = getAssets().list("icons");
+            if (names == null) return;
+            for (String n : names) copyAsset("icons/" + n, new File(dst, n));
+        } catch (Exception ignored) {
+            /* no pack: the overlay falls back to plain discs */
+        }
+    }
+
+    private void copyAsset(String src, File dst) {
+        try {
+            String[] kids = getAssets().list(src);
+            if (kids != null && kids.length > 0) {   /* a folder (on/) */
+                dst.mkdirs();
+                for (String k : kids) copyAsset(src + "/" + k, new File(dst, k));
+                return;
+            }
+        } catch (Exception ignored) {
+            return;
+        }
+        try (InputStream in = getAssets().open(src); OutputStream out = new FileOutputStream(dst)) {
+            byte[] buf = new byte[8192];
+            int r;
+            while ((r = in.read(buf)) > 0) out.write(buf, 0, r);
+        } catch (Exception ignored) {
+            /* one missing icon is not fatal */
+        }
+    }
+
     private void play() {
         if (!hasStorage()) { pendingPlay = true; requestStorage(); return; }
         saveChoices();
         String folder = prefs.getString("folder", null);
         File save = new File(folder, "port/save");
         save.mkdirs();
+        installIcons(new File(folder));
         /* Read the skip-cutscenes value the game saved BEFORE opening the file
          * for writing: FileOutputStream truncates it. */
         int skip = 0;
