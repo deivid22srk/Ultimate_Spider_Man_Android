@@ -409,6 +409,55 @@ overlay again. It also fades the overlay to 30 % after 2.5 s without a touch
 (back to full on any touch), so it stops covering the game's own menus, which
 are tapped through the virtual cursor — a stopgap until the contextual HUD.
 
+## 11e. The game still rendered 800x600 inside the fixed back buffer (measured, fixed)
+
+The §11d fix made the *back buffer* match the window, and the next phone run
+(`Screenshot_20261025-202201.png`, `2log.txt`) showed the next layer of the
+problem: the frame now sits in a crisp 800x600 box in the top-left corner of
+the 2285x1080 back buffer, everything right and below it stays black, the HUD
+icons smear across the whole screen, and the box's contents flicker. The log
+confirms it end to end: `CreateDevice 800x600` → `back buffer 800x600 is not
+the window's aspect: using 2285x1080` → `touch: back buffer 2285x1080, window
+2285x1080`.
+
+The cause: USM never reads the real back buffer size. It parses its resolution
+out of `pcconfig.txt` (800x600 on a fresh install) into its own globals — three
+width/height pairs, a `D3DPRESENT_PARAMETERS` copy and a Windowed flag — and
+builds the viewport, the menu/HUD layout and the camera projection from those.
+Asked to render into a 2285x1080 back buffer it still lays out for 800x600,
+clears only that viewport, and leaves the rest of the swap chain images
+untouched; the touch overlay (drawn over the full back buffer every Present)
+then *accumulates* in the never-cleared region, a different ghost history per
+swap chain image, which is the flicker. Its menu text is cut off at the box
+edge for the same reason: the UI is laid out across the client rect our shims
+report (2285x1080) but the viewport clips it at 800x600.
+
+Fix, still in `runtime/d3d9_bridge.cpp` (`pp_fix_size` → `usm_display::sync_size`):
+whenever the game requests a size that is not at the window's aspect, the six
+resolution globals, the `D3DPRESENT_PARAMETERS` copy and the Windowed flag are
+moved to the window's size *before* the host `CreateDevice`/`Reset` runs, so
+the game's viewport, layout and projection agree with the swap chain from the
+first frame. The addresses are not hardcoded: the runtime locates them once
+with the same byte patterns the community WidescreenFix uses on this exact exe
+(ThirteenAG/WidescreenFixesPack, `source/UltimateSpiderMan.WidescreenFix`,
+whose comments confirm where each pattern lands on USM.exe 1.0.0.1), requiring
+a unique match and validating the Windowed flag two ways before trusting them;
+a mismatch disables the sync and logs it. The camera projection aspect
+(`geometry_manager::PROJ_ASPECT`, also found by pattern) is then held at the
+window's aspect on every presented frame, which keeps the world at Hor+
+proportions instead of stretching it 1.59x across the wider viewport — the
+game only rewrites that value when its aspect setting changes, so the hold
+wins every normal frame. A fresh-install resolution string is left alone: the
+sync overrides whatever the game parsed, per boot.
+
+With the game rendering at the window's size the never-cleared region is gone,
+so the ghosting/flicker is gone with it, the overlay's layout (already aspect-
+corrected in §11d) lands on the game's own coordinate space, and the cursor
+space `user32_set_screen` parks matches what the menus divide it by.
+`touch_setup_guest` also logs `pcconfig.txt`'s keys once per launch now, so the
+config's resolution/aspect key names are visible in `port/log.txt` for any
+future work that wants to force them at the source.
+
 ## 12. Risk plan
 
 | Risk | Likelihood | Mitigation |
