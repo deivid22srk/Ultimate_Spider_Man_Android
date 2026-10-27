@@ -22,8 +22,16 @@
 
 /* ---- logging ---- */
 extern int g_log_level;
-#define LOG(...) do { if (g_log_level > 0) { fprintf(stderr, __VA_ARGS__); fputc('\n', stderr); } } while (0)
-#define TRACE(...) do { if (g_log_level > 1) { fprintf(stderr, __VA_ARGS__); fputc('\n', stderr); } } while (0)
+/* The port's stderr is redirected to <game>/port/log.txt, which a bug report
+ * from a phone never carries; rt_log_line writes every line to logcat too.
+ * driver_android.cpp includes rt.h outside an extern "C" block, so the C
+ * linkage has to be spelled out here. */
+#ifdef __cplusplus
+extern "C"
+#endif
+void rt_log_line(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
+#define LOG(...) do { if (g_log_level > 0) rt_log_line(__VA_ARGS__); } while (0)
+#define TRACE(...) do { if (g_log_level > 1) rt_log_line(__VA_ARGS__); } while (0)
 void rt_fatal(const char *fmt, ...) __attribute__((noreturn, format(printf, 1, 2)));
 
 /* ---- shims ---- */

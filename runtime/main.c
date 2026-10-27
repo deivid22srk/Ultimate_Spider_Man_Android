@@ -17,6 +17,7 @@
 #include <sys/stat.h>
 #ifdef __ANDROID__
 #include <SDL2/SDL.h>
+#include <android/log.h>
 #endif
 
 uint8_t *MEM;
@@ -26,6 +27,21 @@ char g_game_dir[1024] = ".";
 char g_save_dir[1024] = "./save";
 uint32_t g_image_size;
 uint32_t g_entry;
+
+void rt_log_line(const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    vfprintf(stderr, fmt, ap);
+    va_end(ap);
+    fputc('\n', stderr);
+#ifdef __ANDROID__
+    /* Also mirror to logcat: the port log lives in <game>/port/log.txt and is
+     * otherwise invisible in a logcat capture. */
+    va_start(ap, fmt);
+    __android_log_vprint(ANDROID_LOG_INFO, "USM", fmt, ap);
+    va_end(ap);
+#endif
+}
 
 void rt_fatal(const char *fmt, ...) {
     va_list ap;

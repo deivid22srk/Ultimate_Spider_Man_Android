@@ -1,5 +1,8 @@
 #include "../wsi_presenter.h"
 
+#include "../../util/util_string.h"
+#include "../../util/log/log.h"
+
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_vulkan.h>
 
@@ -13,9 +16,15 @@ namespace dxvk::wsi {
           VkSurfaceKHR*       pSurface) {
     SDL_Window* window = fromHwnd(hWindow);
 
-    return SDL_Vulkan_CreateSurface(window, vki->instance(), pSurface)
-         ? VK_SUCCESS
-         : VK_ERROR_OUT_OF_HOST_MEMORY;
+    if (!SDL_Vulkan_CreateSurface(window, vki->instance(), pSurface)) {
+      /* Port: returning VK_ERROR_OUT_OF_HOST_MEMORY here used to swallow the
+       * reason (loader/instance mismatch, no VK_KHR_android_surface, no native
+       * window, ...). Log it, it is the only clue a report will carry. */
+      Logger::err(str::format("SDL_Vulkan_CreateSurface: ", SDL_GetError()));
+      return VK_ERROR_OUT_OF_HOST_MEMORY;
+    }
+
+    return VK_SUCCESS;
   }
 
 }

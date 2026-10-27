@@ -2,6 +2,10 @@
 
 #include "../util_env.h"
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
+
 namespace dxvk {
   
   Logger::Logger(const std::string& file_name)
@@ -62,11 +66,24 @@ namespace dxvk {
       
       const char* prefix = s_prefixes.at(static_cast<uint32_t>(level));
 
+#ifdef __ANDROID__
+      /* Port: the port's stderr is redirected to <game>/port/log.txt, so DXVK's
+       * own messages never show up in a logcat capture. Mirror them, otherwise
+       * a phone bug report carries the crash but no reason for it. */
+      static const std::array<int, 5> s_prios
+        = {{ ANDROID_LOG_VERBOSE, ANDROID_LOG_DEBUG, ANDROID_LOG_INFO, ANDROID_LOG_WARN, ANDROID_LOG_ERROR }};
+      const int prio = s_prios.at(static_cast<uint32_t>(level));
+#endif
+
       std::stringstream stream(message);
       std::string       line;
 
       while (std::getline(stream, line, '\n')) {
         std::cerr << prefix << line << std::endl;
+
+#ifdef __ANDROID__
+        __android_log_print(prio, "DXVK", "%s%s", prefix, line.c_str());
+#endif
 
         if (m_fileStream)
           m_fileStream << prefix << line << std::endl;
