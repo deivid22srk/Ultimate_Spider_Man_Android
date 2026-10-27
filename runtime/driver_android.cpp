@@ -24,7 +24,10 @@
  *      deep inside linkernsbypass with nothing usable in the log),
  *   2. instance extension enumeration (the step that makes the system loader
  *      actually load the driver through the adrenotools hook),
- *   3. a throwaway VkInstance with the same WSI extensions DXVK asks for,
+ *   3. a throwaway VkInstance with the same WSI extensions DXVK asks for
+ *      (only global commands are resolved against VK_NULL_HANDLE -- instance
+ *      commands like vkDestroyInstance come from the instance itself, the
+ *      Android loader returns nullptr for them without one),
  *   4. physical device enumeration + properties + memory heaps (the adapter
  *      identity lands in the log, so a report says which driver it ran on),
  *   5. a VkDevice, and a host-visible allocation mapped, written and unmapped
@@ -147,12 +150,22 @@ const char *probe_driver(void *gipa_, std::string &detail) {
         return "WSI extensions";
     }
 
-    /* 2. throwaway instance, same shape as the one DXVK creates. */
+    /* 2. throwaway instance, same shape as the one DXVK creates. Only
+     *    vkCreateInstance can be checked here: with a NULL instance the
+     *    Android loader hands out just the global commands (vkCreateInstance,
+     *    vkGetInstanceProcAddr, vkEnumerateInstanceVersion,
+     *    vkEnumerateInstanceLayerProperties, vkEnumerateInstanceExtensionProperties)
+     *    and returns nullptr for every other name -- vkDestroyInstance is an
+     *    instance command, so querying it without an instance always returned
+     *    null and the probe failed with "vkCreateInstance/vkDestroyInstance
+     *    missing" on every correct loader, rejecting every driver pack
+     *    (logcat even says "invalid vkGetInstanceProcAddr(VK_NULL_HANDLE, ...)").
+     *    vkDestroyInstance is fetched from the real instance below, where it
+     *    legitimately exists. */
     auto createInstance = PROBE_PFN(nullptr, vkCreateInstance);
-    auto destroyInstance = PROBE_PFN(nullptr, vkDestroyInstance);
-    if (!createInstance || !destroyInstance) {
+    if (!createInstance) {
         g_probe_armed = 0;
-        detail = "vkCreateInstance/vkDestroyInstance missing";
+        detail = "vkCreateInstance missing";
         return "loader symbol";
     }
     VkApplicationInfo app{};
@@ -172,6 +185,10 @@ const char *probe_driver(void *gipa_, std::string &detail) {
         detail = std::string("VkResult ") + std::to_string((int)vr);
         return "vkCreateInstance";
     }
+    /* Instance commands exist only with the instance in hand; resolving
+     * vkDestroyInstance here is the spec-correct way and doubles as a check
+     * that the loader's instance dispatch came up. */
+    auto destroyInstance = PROBE_PFN(inst, vkDestroyInstance);
 
     /* 3. physical devices: identity + memory heaps go to the log. */
     auto enumPDs = PROBE_PFN(inst, vkEnumeratePhysicalDevices);
@@ -183,8 +200,17 @@ const char *probe_driver(void *gipa_, std::string &detail) {
     const char *step = "loader symbol";
     VkDevice dev = VK_NULL_HANDLE;
     do {
-        if (!enumPDs || !pdProps || !pdMem || !pdQueues || !createDevice || !destroyDevice) {
-            detail = "instance symbols missing";
+        const char *missing = nullptr;
+        if (!destroyInstance) missing = "vkDestroyInstance";
+        else if (!enumPDs) missing = "vkEnumeratePhysicalDevices";
+        else if (!pdProps) missing = "vkGetPhysicalDeviceProperties";
+        else if (!pdMem) missing = "vkGetPhysicalDeviceMemoryProperties";
+        else if (!pdQueues) missing = "vkGetPhysicalDeviceQueueFamilyProperties";
+        else if (!createDevice) missing = "vkCreateDevice";
+        else if (!destroyDevice) missing = "vkDestroyDevice";
+        if (missing) {
+            detail = std::string(missing) + " missing";
+            step = "instance symbols";
             break;
         }
         uint32_t npd = 0;
@@ -263,7 +289,12 @@ const char *probe_driver(void *gipa_, std::string &detail) {
         auto freeMem = PROBE_PFN(inst, vkFreeMemory);
         auto mapMem = PROBE_PFN(inst, vkMapMemory);
         auto unmapMem = PROBE_PFN(inst, vkUnmapMemory);
-        if (!allocMem || !freeMem || !mapMem || !unmapMem) { detail = "memory symbols missing"; step = "loader symbol"; break; }
+        const char *mmissing = nullptr;
+        if (!allocMem) mmissing = "vkAllocateMemory";
+        else if (!freeMem) mmissing = "vkFreeMemory";
+        else if (!mapMem) mmissing = "vkMapMemory";
+        else if (!unmapMem) mmissing = "vkUnmapMemory";
+        if (mmissing) { detail = std::string(mmissing) + " missing"; step = "instance symbols"; break; }
 
         VkMemoryAllocateInfo mai{};
         mai.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -290,8 +321,8 @@ const char *probe_driver(void *gipa_, std::string &detail) {
         step = nullptr;                             /* everything passed */
     } while (0);
 
-    if (dev) destroyDevice(dev, nullptr);
-    destroyInstance(inst, nullptr);
+    if (dev && destroyDevice) destroyDevice(dev, nullptr);
+    if (inst && destroyInstance) destroyInstance(inst, nullptr);
     g_probe_armed = 0;
     return step;
 }
