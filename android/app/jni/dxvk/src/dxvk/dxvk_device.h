@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+
 #include "dxvk_adapter.h"
 #include "dxvk_buffer.h"
 #include "dxvk_compute.h"
@@ -38,6 +40,11 @@ namespace dxvk {
    *  shaderClipDistance = 0 and their shader compiler faults on a module that
    *  declares BuiltIn ClipDistance, so the shaders must not use it there. */
   extern bool g_dxvkClipDistance;
+  /** Port: set once the Vulkan device is lost (VK_ERROR_DEVICE_LOST at submit
+   *  or at fence sync). After this nothing will ever render again, and the
+   *  port's watchdog reads the flag (via dxvk_device_lost) to tell a GPU
+   *  driver fault apart from a game-logic hang, so the log can say which. */
+  extern std::atomic<bool> g_dxvkDeviceLost;
 
   
   class DxvkInstance;

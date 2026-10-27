@@ -6,8 +6,19 @@ namespace dxvk {
   bool g_dxvkDepthClamp = true;
   bool g_dxvkUbyte4AsUint = false;
   bool g_dxvkClipDistance = false;
+  std::atomic<bool> g_dxvkDeviceLost = { false };
 
-  
+}
+
+// Port: read by the game runtime's watchdog (C code in runtime/dispatch.c)
+// once the frame counter stops moving, so its verdict can say "the GPU driver
+// faulted" instead of logging watchdog lines forever with no explanation.
+extern "C" int dxvk_device_lost(void) {
+  return dxvk::g_dxvkDeviceLost.load(std::memory_order_acquire);
+}
+
+namespace dxvk {
+
   DxvkDevice::DxvkDevice(
     const Rc<DxvkInstance>&         instance,
     const Rc<DxvkAdapter>&          adapter,

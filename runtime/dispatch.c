@@ -122,11 +122,32 @@ static void *wd_thread(void *arg) {
     (void)arg;
     uint32_t last[WD_MAX] = {0}, still[WD_MAX] = {0};
     extern int platform_frame_count(void);
-    int lastf = -1;
+    extern int dxvk_device_lost(void);      /* from libdxvk_d3d9 (dxvk_device.cpp) */
+    extern void d3d9_dump_last_calls(void); /* from the D3D9 bridge (d3d9_bridge.cpp) */
+    int lastf = -1, lost_shown = 0, hang_dumped = 0;
     for (int tick = 1;; tick++) {
         sleep(5);
         int n = g_wd_n < WD_MAX ? g_wd_n : WD_MAX, f = platform_frame_count();
         int report = tick % 6 == 0 || f == lastf;  /* every 30 s, or every 5 s while no frame is presented */
+
+        /* The frame counter stopped. Two very different reasons, and the log
+         * should say which one instead of printing watchdog lines forever:
+         *   - the Vulkan device was lost (the GPU driver rejected a command
+         *     buffer; DXVK logs "Command submission failed"), or
+         *   - the game itself deadlocked with the GPU still fine. */
+        if (f == lastf && lastf >= 0 && !lost_shown) {
+            if (dxvk_device_lost()) {
+                LOG("verdict: VK_ERROR_DEVICE_LOST - the GPU driver rejected a command buffer and can not recover; the freeze is a driver fault, not a game hang");
+                LOG("last D3D9 calls before the device loss (ring buffer):");
+                d3d9_dump_last_calls();
+                lost_shown = hang_dumped = 1;
+            } else if (!hang_dumped) {
+                LOG("no new frames with the GPU healthy - last D3D9 calls before the hang (ring buffer):");
+                d3d9_dump_last_calls();
+                hang_dumped = 1;
+            }
+        }
+
         for (int i = 0; i < n; i++) {
             uint32_t k = g_wd[i].calls;
             still[i] = k == last[i] ? still[i] + 5 : 0;
