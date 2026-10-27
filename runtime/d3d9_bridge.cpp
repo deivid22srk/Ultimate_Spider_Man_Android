@@ -3,6 +3,7 @@
 // presentation). Everything else is generated into d3d9_bridge_gen.cpp.
 #include <SDL2/SDL.h>
 #include <ctype.h>
+#include <atomic>
 #include <functional>
 #include <vector>
 void shadow_flush(void *obj);
@@ -504,11 +505,31 @@ void B_IDirect3DDevice9_Reset(CPU *c) {
 }
 
 // LB_D3DTRACE=from:to logs every generated bridge call made during those
-// frames (counted by Present) to stderr.
+// frames (counted by Present) to stderr. Besides printing there, d3d_trace
+// always feeds a small ring buffer: when frames stop being presented, the
+// watchdog dumps it, so the log names the exact D3D9 calls that preceded a
+// hang or a GPU-driver fault (VK_ERROR_DEVICE_LOST) with no reproduction
+// needed on this end.
 int g_d3d_trace;
 static int g_frame, g_trace_from = -1, g_trace_to = -1;
 
+#define D3D_RING_N 96
+namespace {
+struct D3DRingEntry { const char *name; uint32_t a[4]; int32_t frame; };
+D3DRingEntry g_d3d_ring[D3D_RING_N];
+std::atomic<uint32_t> g_d3d_ring_at{0};
+}
+
 void d3d_trace(CPU *c, const char *name, int nargs) {
+    /* Record first: this runs on every bridge call, so keep it to a few
+     * stores. The name pointers are static string literals, safe to hold. */
+    D3DRingEntry &e = g_d3d_ring[g_d3d_ring_at.fetch_add(1, std::memory_order_relaxed) % D3D_RING_N];
+    e.name = name;
+    e.frame = (int32_t)g_frame;
+    for (int i = 0; i < 4; i++)
+        e.a[i] = i < nargs ? ARG(i + 1) : 0;
+
+    if (!g_d3d_trace) return;
     fprintf(stderr, "D3D %d %s", g_frame, name);
     for (int i = 1; i <= nargs; i++) fprintf(stderr, " %x", ARG(i));
     if (strstr(name, "ConstantF") && ARG(2))
@@ -518,6 +539,18 @@ void d3d_trace(CPU *c, const char *name, int nargs) {
         for (uint32_t i = 0; i < 16; i++)
             fprintf(stderr, "%s%g", i % 4 ? " " : " | ", *(float *)GPTR(ARG(2) + 4 * i));
     fprintf(stderr, "\n");
+}
+
+// The ring, oldest to newest, for the watchdog's verdict on a frozen game.
+extern "C" void d3d9_dump_last_calls(void) {
+    uint32_t at = g_d3d_ring_at.load(std::memory_order_relaxed);
+    uint32_t n = at < D3D_RING_N ? at : D3D_RING_N;
+    for (uint32_t k = 0; k < n; k++) {
+        const D3DRingEntry &e = g_d3d_ring[(at - n + k) % D3D_RING_N];
+        fprintf(stderr, "  d3d %3d (frame %d): %s %08x %08x %08x %08x\n",
+                (int)(k + 1), e.frame, e.name ? e.name : "-", e.a[0], e.a[1], e.a[2], e.a[3]);
+    }
+    fprintf(stderr, "  d3d: end of the last %u bridge calls\n", n);
 }
 
 // LB_BISECT=F: on frame F+2k, skip the k-th draw call of the frame and save
@@ -562,6 +595,9 @@ static void d3d9_frame_begin(void) {
 void B_IDirect3DDevice9_Present(CPU *c) {
     auto *d = (IDirect3DDevice9 *)com_host(ARG(0));
     d3d9_frame_begin();  /* publish the frame's draw total before the overlay reads it */
+    /* Present is hand-written (no generated thunk), so feed the watchdog's
+     * ring here too: the freeze verdict should show where each frame ended. */
+    d3d_trace(c, "IDirect3DDevice9::Present", 0);
     if (g_trace_from < 0) {
         const char *e = getenv("LB_D3DTRACE");
         g_trace_from = 1 << 30;

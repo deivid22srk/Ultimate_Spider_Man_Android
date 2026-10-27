@@ -6,49 +6,49 @@ static void B_IDirect3D9_AddRef(CPU *c) { com_AddRef(c); }
 static void B_IDirect3D9_Release(CPU *c) { com_Release(c); }
 static void B_IDirect3D9_RegisterSoftwareDevice(CPU *c) {
     IDirect3D9 *self = (IDirect3D9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3D9::RegisterSoftwareDevice", 1);
+    d3d_trace(c, "IDirect3D9::RegisterSoftwareDevice", 1);
     auto r = bridge_call(self, &IDirect3D9::RegisterSoftwareDevice, GPTR(ARG(1)));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3D9_GetAdapterCount(CPU *c) {
     IDirect3D9 *self = (IDirect3D9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3D9::GetAdapterCount", 0);
+    d3d_trace(c, "IDirect3D9::GetAdapterCount", 0);
     auto r = bridge_call(self, &IDirect3D9::GetAdapterCount);
     RET((uint32_t)r, 1);
 }
 
 static void B_IDirect3D9_CheckDeviceType(CPU *c) {
     IDirect3D9 *self = (IDirect3D9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3D9::CheckDeviceType", 5);
+    d3d_trace(c, "IDirect3D9::CheckDeviceType", 5);
     auto r = bridge_call(self, &IDirect3D9::CheckDeviceType, ARG(1), ARG(2), ARG(3), ARG(4), ARG(5));
     RET((uint32_t)r, 6);
 }
 
 static void B_IDirect3D9_CheckDeviceMultiSampleType(CPU *c) {
     IDirect3D9 *self = (IDirect3D9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3D9::CheckDeviceMultiSampleType", 6);
+    d3d_trace(c, "IDirect3D9::CheckDeviceMultiSampleType", 6);
     auto r = bridge_call(self, &IDirect3D9::CheckDeviceMultiSampleType, ARG(1), ARG(2), ARG(3), ARG(4), ARG(5), GPTR(ARG(6)));
     RET((uint32_t)r, 7);
 }
 
 static void B_IDirect3D9_CheckDepthStencilMatch(CPU *c) {
     IDirect3D9 *self = (IDirect3D9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3D9::CheckDepthStencilMatch", 5);
+    d3d_trace(c, "IDirect3D9::CheckDepthStencilMatch", 5);
     auto r = bridge_call(self, &IDirect3D9::CheckDepthStencilMatch, ARG(1), ARG(2), ARG(3), ARG(4), ARG(5));
     RET((uint32_t)r, 6);
 }
 
 static void B_IDirect3D9_CheckDeviceFormatConversion(CPU *c) {
     IDirect3D9 *self = (IDirect3D9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3D9::CheckDeviceFormatConversion", 4);
+    d3d_trace(c, "IDirect3D9::CheckDeviceFormatConversion", 4);
     auto r = bridge_call(self, &IDirect3D9::CheckDeviceFormatConversion, ARG(1), ARG(2), ARG(3), ARG(4));
     RET((uint32_t)r, 5);
 }
 
 static void B_IDirect3D9_GetDeviceCaps(CPU *c) {
     IDirect3D9 *self = (IDirect3D9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3D9::GetDeviceCaps", 3);
+    d3d_trace(c, "IDirect3D9::GetDeviceCaps", 3);
     auto r = bridge_call(self, &IDirect3D9::GetDeviceCaps, ARG(1), ARG(2), GPTR(ARG(3)));
     RET((uint32_t)r, 4);
 }
@@ -58,28 +58,28 @@ static void B_IDirect3DDevice9_AddRef(CPU *c) { com_AddRef(c); }
 static void B_IDirect3DDevice9_Release(CPU *c) { com_Release(c); }
 static void B_IDirect3DDevice9_TestCooperativeLevel(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::TestCooperativeLevel", 0);
+    d3d_trace(c, "IDirect3DDevice9::TestCooperativeLevel", 0);
     auto r = bridge_call(self, &IDirect3DDevice9::TestCooperativeLevel);
     RET((uint32_t)r, 1);
 }
 
 static void B_IDirect3DDevice9_GetAvailableTextureMem(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetAvailableTextureMem", 0);
+    d3d_trace(c, "IDirect3DDevice9::GetAvailableTextureMem", 0);
     auto r = bridge_call(self, &IDirect3DDevice9::GetAvailableTextureMem);
     RET((uint32_t)r, 1);
 }
 
 static void B_IDirect3DDevice9_EvictManagedResources(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::EvictManagedResources", 0);
+    d3d_trace(c, "IDirect3DDevice9::EvictManagedResources", 0);
     auto r = bridge_call(self, &IDirect3DDevice9::EvictManagedResources);
     RET((uint32_t)r, 1);
 }
 
 static void B_IDirect3DDevice9_GetDirect3D(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetDirect3D", 1);
+    d3d_trace(c, "IDirect3DDevice9::GetDirect3D", 1);
     IDirect3D9 *out0 = nullptr;
     auto r = bridge_call(self, &IDirect3DDevice9::GetDirect3D, &out0);
     if (ARG(1)) M32(ARG(1)) = d3d9_wrap(out0, IFACE_IDirect3D9);
@@ -88,42 +88,42 @@ static void B_IDirect3DDevice9_GetDirect3D(CPU *c) {
 
 static void B_IDirect3DDevice9_GetDeviceCaps(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetDeviceCaps", 1);
+    d3d_trace(c, "IDirect3DDevice9::GetDeviceCaps", 1);
     auto r = bridge_call(self, &IDirect3DDevice9::GetDeviceCaps, GPTR(ARG(1)));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DDevice9_GetDisplayMode(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetDisplayMode", 2);
+    d3d_trace(c, "IDirect3DDevice9::GetDisplayMode", 2);
     auto r = bridge_call(self, &IDirect3DDevice9::GetDisplayMode, ARG(1), GPTR(ARG(2)));
     RET((uint32_t)r, 3);
 }
 
 static void B_IDirect3DDevice9_SetCursorProperties(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetCursorProperties", 3);
+    d3d_trace(c, "IDirect3DDevice9::SetCursorProperties", 3);
     auto r = bridge_call(self, &IDirect3DDevice9::SetCursorProperties, ARG(1), ARG(2), (IDirect3DSurface9 *)com_host(ARG(3)));
     RET((uint32_t)r, 4);
 }
 
 static void B_IDirect3DDevice9_SetCursorPosition(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetCursorPosition", 3);
+    d3d_trace(c, "IDirect3DDevice9::SetCursorPosition", 3);
     bridge_call(self, &IDirect3DDevice9::SetCursorPosition, (INT)ARG(1), (INT)ARG(2), ARG(3));
     RET(0, 4);
 }
 
 static void B_IDirect3DDevice9_ShowCursor(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::ShowCursor", 1);
+    d3d_trace(c, "IDirect3DDevice9::ShowCursor", 1);
     auto r = bridge_call(self, &IDirect3DDevice9::ShowCursor, ARG(1));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DDevice9_GetSwapChain(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetSwapChain", 2);
+    d3d_trace(c, "IDirect3DDevice9::GetSwapChain", 2);
     IDirect3DSwapChain9 *out1 = nullptr;
     auto r = bridge_call(self, &IDirect3DDevice9::GetSwapChain, ARG(1), &out1);
     if (ARG(2)) M32(ARG(2)) = d3d9_wrap(out1, IFACE_IDirect3DSwapChain9);
@@ -132,14 +132,14 @@ static void B_IDirect3DDevice9_GetSwapChain(CPU *c) {
 
 static void B_IDirect3DDevice9_GetNumberOfSwapChains(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetNumberOfSwapChains", 0);
+    d3d_trace(c, "IDirect3DDevice9::GetNumberOfSwapChains", 0);
     auto r = bridge_call(self, &IDirect3DDevice9::GetNumberOfSwapChains);
     RET((uint32_t)r, 1);
 }
 
 static void B_IDirect3DDevice9_GetBackBuffer(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetBackBuffer", 4);
+    d3d_trace(c, "IDirect3DDevice9::GetBackBuffer", 4);
     IDirect3DSurface9 *out3 = nullptr;
     auto r = bridge_call(self, &IDirect3DDevice9::GetBackBuffer, ARG(1), ARG(2), ARG(3), &out3);
     if (ARG(4)) M32(ARG(4)) = d3d9_wrap(out3, IFACE_IDirect3DSurface9);
@@ -148,35 +148,35 @@ static void B_IDirect3DDevice9_GetBackBuffer(CPU *c) {
 
 static void B_IDirect3DDevice9_GetRasterStatus(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetRasterStatus", 2);
+    d3d_trace(c, "IDirect3DDevice9::GetRasterStatus", 2);
     auto r = bridge_call(self, &IDirect3DDevice9::GetRasterStatus, ARG(1), GPTR(ARG(2)));
     RET((uint32_t)r, 3);
 }
 
 static void B_IDirect3DDevice9_SetDialogBoxMode(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetDialogBoxMode", 1);
+    d3d_trace(c, "IDirect3DDevice9::SetDialogBoxMode", 1);
     auto r = bridge_call(self, &IDirect3DDevice9::SetDialogBoxMode, ARG(1));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DDevice9_SetGammaRamp(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetGammaRamp", 3);
+    d3d_trace(c, "IDirect3DDevice9::SetGammaRamp", 3);
     bridge_call(self, &IDirect3DDevice9::SetGammaRamp, ARG(1), ARG(2), GPTR(ARG(3)));
     RET(0, 4);
 }
 
 static void B_IDirect3DDevice9_GetGammaRamp(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetGammaRamp", 2);
+    d3d_trace(c, "IDirect3DDevice9::GetGammaRamp", 2);
     bridge_call(self, &IDirect3DDevice9::GetGammaRamp, ARG(1), GPTR(ARG(2)));
     RET(0, 3);
 }
 
 static void B_IDirect3DDevice9_CreateVolumeTexture(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::CreateVolumeTexture", 9);
+    d3d_trace(c, "IDirect3DDevice9::CreateVolumeTexture", 9);
     IDirect3DVolumeTexture9 *out7 = nullptr;
     auto r = bridge_call(self, &IDirect3DDevice9::CreateVolumeTexture, ARG(1), ARG(2), ARG(3), ARG(4), ARG(5), ARG(6), ARG(7), &out7, nullptr);
     if (ARG(8)) M32(ARG(8)) = d3d9_wrap(out7, IFACE_IDirect3DVolumeTexture9);
@@ -185,7 +185,7 @@ static void B_IDirect3DDevice9_CreateVolumeTexture(CPU *c) {
 
 static void B_IDirect3DDevice9_CreateVertexBuffer(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::CreateVertexBuffer", 6);
+    d3d_trace(c, "IDirect3DDevice9::CreateVertexBuffer", 6);
     IDirect3DVertexBuffer9 *out4 = nullptr;
     auto r = bridge_call(self, &IDirect3DDevice9::CreateVertexBuffer, ARG(1), ARG(2), ARG(3), ARG(4), &out4, nullptr);
     if (ARG(5)) M32(ARG(5)) = d3d9_wrap(out4, IFACE_IDirect3DVertexBuffer9);
@@ -194,7 +194,7 @@ static void B_IDirect3DDevice9_CreateVertexBuffer(CPU *c) {
 
 static void B_IDirect3DDevice9_CreateIndexBuffer(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::CreateIndexBuffer", 6);
+    d3d_trace(c, "IDirect3DDevice9::CreateIndexBuffer", 6);
     IDirect3DIndexBuffer9 *out4 = nullptr;
     auto r = bridge_call(self, &IDirect3DDevice9::CreateIndexBuffer, ARG(1), ARG(2), ARG(3), ARG(4), &out4, nullptr);
     if (ARG(5)) M32(ARG(5)) = d3d9_wrap(out4, IFACE_IDirect3DIndexBuffer9);
@@ -203,7 +203,7 @@ static void B_IDirect3DDevice9_CreateIndexBuffer(CPU *c) {
 
 static void B_IDirect3DDevice9_CreateRenderTarget(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::CreateRenderTarget", 8);
+    d3d_trace(c, "IDirect3DDevice9::CreateRenderTarget", 8);
     IDirect3DSurface9 *out6 = nullptr;
     auto r = bridge_call(self, &IDirect3DDevice9::CreateRenderTarget, ARG(1), ARG(2), ARG(3), ARG(4), ARG(5), ARG(6), &out6, nullptr);
     if (ARG(7)) M32(ARG(7)) = d3d9_wrap(out6, IFACE_IDirect3DSurface9);
@@ -212,7 +212,7 @@ static void B_IDirect3DDevice9_CreateRenderTarget(CPU *c) {
 
 static void B_IDirect3DDevice9_CreateDepthStencilSurface(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::CreateDepthStencilSurface", 8);
+    d3d_trace(c, "IDirect3DDevice9::CreateDepthStencilSurface", 8);
     IDirect3DSurface9 *out6 = nullptr;
     auto r = bridge_call(self, &IDirect3DDevice9::CreateDepthStencilSurface, ARG(1), ARG(2), ARG(3), ARG(4), ARG(5), ARG(6), &out6, nullptr);
     if (ARG(7)) M32(ARG(7)) = d3d9_wrap(out6, IFACE_IDirect3DSurface9);
@@ -221,35 +221,35 @@ static void B_IDirect3DDevice9_CreateDepthStencilSurface(CPU *c) {
 
 static void B_IDirect3DDevice9_GetRenderTargetData(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetRenderTargetData", 2);
+    d3d_trace(c, "IDirect3DDevice9::GetRenderTargetData", 2);
     auto r = bridge_call(self, &IDirect3DDevice9::GetRenderTargetData, (IDirect3DSurface9 *)com_host(ARG(1)), (IDirect3DSurface9 *)com_host(ARG(2)));
     RET((uint32_t)r, 3);
 }
 
 static void B_IDirect3DDevice9_GetFrontBufferData(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetFrontBufferData", 2);
+    d3d_trace(c, "IDirect3DDevice9::GetFrontBufferData", 2);
     auto r = bridge_call(self, &IDirect3DDevice9::GetFrontBufferData, ARG(1), (IDirect3DSurface9 *)com_host(ARG(2)));
     RET((uint32_t)r, 3);
 }
 
 static void B_IDirect3DDevice9_StretchRect(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::StretchRect", 5);
+    d3d_trace(c, "IDirect3DDevice9::StretchRect", 5);
     auto r = bridge_call(self, &IDirect3DDevice9::StretchRect, (IDirect3DSurface9 *)com_host(ARG(1)), GPTR(ARG(2)), (IDirect3DSurface9 *)com_host(ARG(3)), GPTR(ARG(4)), ARG(5));
     RET((uint32_t)r, 6);
 }
 
 static void B_IDirect3DDevice9_ColorFill(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::ColorFill", 3);
+    d3d_trace(c, "IDirect3DDevice9::ColorFill", 3);
     auto r = bridge_call(self, &IDirect3DDevice9::ColorFill, (IDirect3DSurface9 *)com_host(ARG(1)), GPTR(ARG(2)), ARG(3));
     RET((uint32_t)r, 4);
 }
 
 static void B_IDirect3DDevice9_CreateOffscreenPlainSurface(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::CreateOffscreenPlainSurface", 6);
+    d3d_trace(c, "IDirect3DDevice9::CreateOffscreenPlainSurface", 6);
     IDirect3DSurface9 *out4 = nullptr;
     auto r = bridge_call(self, &IDirect3DDevice9::CreateOffscreenPlainSurface, ARG(1), ARG(2), ARG(3), ARG(4), &out4, nullptr);
     if (ARG(5)) M32(ARG(5)) = d3d9_wrap(out4, IFACE_IDirect3DSurface9);
@@ -258,14 +258,14 @@ static void B_IDirect3DDevice9_CreateOffscreenPlainSurface(CPU *c) {
 
 static void B_IDirect3DDevice9_SetRenderTarget(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetRenderTarget", 2);
+    d3d_trace(c, "IDirect3DDevice9::SetRenderTarget", 2);
     auto r = bridge_call(self, &IDirect3DDevice9::SetRenderTarget, ARG(1), (IDirect3DSurface9 *)com_host(ARG(2)));
     RET((uint32_t)r, 3);
 }
 
 static void B_IDirect3DDevice9_GetRenderTarget(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetRenderTarget", 2);
+    d3d_trace(c, "IDirect3DDevice9::GetRenderTarget", 2);
     IDirect3DSurface9 *out1 = nullptr;
     auto r = bridge_call(self, &IDirect3DDevice9::GetRenderTarget, ARG(1), &out1);
     if (ARG(2)) M32(ARG(2)) = d3d9_wrap(out1, IFACE_IDirect3DSurface9);
@@ -274,14 +274,14 @@ static void B_IDirect3DDevice9_GetRenderTarget(CPU *c) {
 
 static void B_IDirect3DDevice9_SetDepthStencilSurface(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetDepthStencilSurface", 1);
+    d3d_trace(c, "IDirect3DDevice9::SetDepthStencilSurface", 1);
     auto r = bridge_call(self, &IDirect3DDevice9::SetDepthStencilSurface, (IDirect3DSurface9 *)com_host(ARG(1)));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DDevice9_GetDepthStencilSurface(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetDepthStencilSurface", 1);
+    d3d_trace(c, "IDirect3DDevice9::GetDepthStencilSurface", 1);
     IDirect3DSurface9 *out0 = nullptr;
     auto r = bridge_call(self, &IDirect3DDevice9::GetDepthStencilSurface, &out0);
     if (ARG(1)) M32(ARG(1)) = d3d9_wrap(out0, IFACE_IDirect3DSurface9);
@@ -290,133 +290,133 @@ static void B_IDirect3DDevice9_GetDepthStencilSurface(CPU *c) {
 
 static void B_IDirect3DDevice9_BeginScene(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::BeginScene", 0);
+    d3d_trace(c, "IDirect3DDevice9::BeginScene", 0);
     auto r = bridge_call(self, &IDirect3DDevice9::BeginScene);
     RET((uint32_t)r, 1);
 }
 
 static void B_IDirect3DDevice9_EndScene(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::EndScene", 0);
+    d3d_trace(c, "IDirect3DDevice9::EndScene", 0);
     auto r = bridge_call(self, &IDirect3DDevice9::EndScene);
     RET((uint32_t)r, 1);
 }
 
 static void B_IDirect3DDevice9_Clear(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::Clear", 6);
+    d3d_trace(c, "IDirect3DDevice9::Clear", 6);
     auto r = bridge_call(self, &IDirect3DDevice9::Clear, ARG(1), GPTR(ARG(2)), ARG(3), ARG(4), ARGF(5), ARG(6));
     RET((uint32_t)r, 7);
 }
 
 static void B_IDirect3DDevice9_SetTransform(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetTransform", 2);
+    d3d_trace(c, "IDirect3DDevice9::SetTransform", 2);
     auto r = bridge_call(self, &IDirect3DDevice9::SetTransform, ARG(1), GPTR(ARG(2)));
     RET((uint32_t)r, 3);
 }
 
 static void B_IDirect3DDevice9_GetTransform(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetTransform", 2);
+    d3d_trace(c, "IDirect3DDevice9::GetTransform", 2);
     auto r = bridge_call(self, &IDirect3DDevice9::GetTransform, ARG(1), GPTR(ARG(2)));
     RET((uint32_t)r, 3);
 }
 
 static void B_IDirect3DDevice9_MultiplyTransform(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::MultiplyTransform", 2);
+    d3d_trace(c, "IDirect3DDevice9::MultiplyTransform", 2);
     auto r = bridge_call(self, &IDirect3DDevice9::MultiplyTransform, ARG(1), GPTR(ARG(2)));
     RET((uint32_t)r, 3);
 }
 
 static void B_IDirect3DDevice9_SetViewport(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetViewport", 1);
+    d3d_trace(c, "IDirect3DDevice9::SetViewport", 1);
     auto r = bridge_call(self, &IDirect3DDevice9::SetViewport, GPTR(ARG(1)));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DDevice9_GetViewport(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetViewport", 1);
+    d3d_trace(c, "IDirect3DDevice9::GetViewport", 1);
     auto r = bridge_call(self, &IDirect3DDevice9::GetViewport, GPTR(ARG(1)));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DDevice9_SetMaterial(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetMaterial", 1);
+    d3d_trace(c, "IDirect3DDevice9::SetMaterial", 1);
     auto r = bridge_call(self, &IDirect3DDevice9::SetMaterial, GPTR(ARG(1)));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DDevice9_GetMaterial(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetMaterial", 1);
+    d3d_trace(c, "IDirect3DDevice9::GetMaterial", 1);
     auto r = bridge_call(self, &IDirect3DDevice9::GetMaterial, GPTR(ARG(1)));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DDevice9_SetLight(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetLight", 2);
+    d3d_trace(c, "IDirect3DDevice9::SetLight", 2);
     auto r = bridge_call(self, &IDirect3DDevice9::SetLight, ARG(1), GPTR(ARG(2)));
     RET((uint32_t)r, 3);
 }
 
 static void B_IDirect3DDevice9_GetLight(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetLight", 2);
+    d3d_trace(c, "IDirect3DDevice9::GetLight", 2);
     auto r = bridge_call(self, &IDirect3DDevice9::GetLight, ARG(1), GPTR(ARG(2)));
     RET((uint32_t)r, 3);
 }
 
 static void B_IDirect3DDevice9_LightEnable(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::LightEnable", 2);
+    d3d_trace(c, "IDirect3DDevice9::LightEnable", 2);
     auto r = bridge_call(self, &IDirect3DDevice9::LightEnable, ARG(1), ARG(2));
     RET((uint32_t)r, 3);
 }
 
 static void B_IDirect3DDevice9_GetLightEnable(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetLightEnable", 2);
+    d3d_trace(c, "IDirect3DDevice9::GetLightEnable", 2);
     auto r = bridge_call(self, &IDirect3DDevice9::GetLightEnable, ARG(1), GPTR(ARG(2)));
     RET((uint32_t)r, 3);
 }
 
 static void B_IDirect3DDevice9_SetClipPlane(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetClipPlane", 2);
+    d3d_trace(c, "IDirect3DDevice9::SetClipPlane", 2);
     auto r = bridge_call(self, &IDirect3DDevice9::SetClipPlane, ARG(1), GPTR(ARG(2)));
     RET((uint32_t)r, 3);
 }
 
 static void B_IDirect3DDevice9_GetClipPlane(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetClipPlane", 2);
+    d3d_trace(c, "IDirect3DDevice9::GetClipPlane", 2);
     auto r = bridge_call(self, &IDirect3DDevice9::GetClipPlane, ARG(1), GPTR(ARG(2)));
     RET((uint32_t)r, 3);
 }
 
 static void B_IDirect3DDevice9_SetRenderState(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetRenderState", 2);
+    d3d_trace(c, "IDirect3DDevice9::SetRenderState", 2);
     auto r = bridge_call(self, &IDirect3DDevice9::SetRenderState, ARG(1), ARG(2));
     RET((uint32_t)r, 3);
 }
 
 static void B_IDirect3DDevice9_GetRenderState(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetRenderState", 2);
+    d3d_trace(c, "IDirect3DDevice9::GetRenderState", 2);
     auto r = bridge_call(self, &IDirect3DDevice9::GetRenderState, ARG(1), GPTR(ARG(2)));
     RET((uint32_t)r, 3);
 }
 
 static void B_IDirect3DDevice9_CreateStateBlock(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::CreateStateBlock", 2);
+    d3d_trace(c, "IDirect3DDevice9::CreateStateBlock", 2);
     IDirect3DStateBlock9 *out1 = nullptr;
     auto r = bridge_call(self, &IDirect3DDevice9::CreateStateBlock, ARG(1), &out1);
     if (ARG(2)) M32(ARG(2)) = d3d9_wrap(out1, IFACE_IDirect3DStateBlock9);
@@ -425,14 +425,14 @@ static void B_IDirect3DDevice9_CreateStateBlock(CPU *c) {
 
 static void B_IDirect3DDevice9_BeginStateBlock(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::BeginStateBlock", 0);
+    d3d_trace(c, "IDirect3DDevice9::BeginStateBlock", 0);
     auto r = bridge_call(self, &IDirect3DDevice9::BeginStateBlock);
     RET((uint32_t)r, 1);
 }
 
 static void B_IDirect3DDevice9_EndStateBlock(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::EndStateBlock", 1);
+    d3d_trace(c, "IDirect3DDevice9::EndStateBlock", 1);
     IDirect3DStateBlock9 *out0 = nullptr;
     auto r = bridge_call(self, &IDirect3DDevice9::EndStateBlock, &out0);
     if (ARG(1)) M32(ARG(1)) = d3d9_wrap(out0, IFACE_IDirect3DStateBlock9);
@@ -441,21 +441,21 @@ static void B_IDirect3DDevice9_EndStateBlock(CPU *c) {
 
 static void B_IDirect3DDevice9_SetClipStatus(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetClipStatus", 1);
+    d3d_trace(c, "IDirect3DDevice9::SetClipStatus", 1);
     auto r = bridge_call(self, &IDirect3DDevice9::SetClipStatus, GPTR(ARG(1)));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DDevice9_GetClipStatus(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetClipStatus", 1);
+    d3d_trace(c, "IDirect3DDevice9::GetClipStatus", 1);
     auto r = bridge_call(self, &IDirect3DDevice9::GetClipStatus, GPTR(ARG(1)));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DDevice9_GetTexture(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetTexture", 2);
+    d3d_trace(c, "IDirect3DDevice9::GetTexture", 2);
     IDirect3DBaseTexture9 *out1 = nullptr;
     auto r = bridge_call(self, &IDirect3DDevice9::GetTexture, ARG(1), &out1);
     if (ARG(2)) M32(ARG(2)) = d3d9_wrap(out1, IFACE_IDirect3DBaseTexture9);
@@ -464,112 +464,112 @@ static void B_IDirect3DDevice9_GetTexture(CPU *c) {
 
 static void B_IDirect3DDevice9_SetTexture(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetTexture", 2);
+    d3d_trace(c, "IDirect3DDevice9::SetTexture", 2);
     auto r = bridge_call(self, &IDirect3DDevice9::SetTexture, ARG(1), (IDirect3DBaseTexture9 *)com_host(ARG(2)));
     RET((uint32_t)r, 3);
 }
 
 static void B_IDirect3DDevice9_GetTextureStageState(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetTextureStageState", 3);
+    d3d_trace(c, "IDirect3DDevice9::GetTextureStageState", 3);
     auto r = bridge_call(self, &IDirect3DDevice9::GetTextureStageState, ARG(1), ARG(2), GPTR(ARG(3)));
     RET((uint32_t)r, 4);
 }
 
 static void B_IDirect3DDevice9_SetTextureStageState(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetTextureStageState", 3);
+    d3d_trace(c, "IDirect3DDevice9::SetTextureStageState", 3);
     auto r = bridge_call(self, &IDirect3DDevice9::SetTextureStageState, ARG(1), ARG(2), ARG(3));
     RET((uint32_t)r, 4);
 }
 
 static void B_IDirect3DDevice9_GetSamplerState(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetSamplerState", 3);
+    d3d_trace(c, "IDirect3DDevice9::GetSamplerState", 3);
     auto r = bridge_call(self, &IDirect3DDevice9::GetSamplerState, ARG(1), ARG(2), GPTR(ARG(3)));
     RET((uint32_t)r, 4);
 }
 
 static void B_IDirect3DDevice9_SetSamplerState(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetSamplerState", 3);
+    d3d_trace(c, "IDirect3DDevice9::SetSamplerState", 3);
     auto r = bridge_call(self, &IDirect3DDevice9::SetSamplerState, ARG(1), ARG(2), ARG(3));
     RET((uint32_t)r, 4);
 }
 
 static void B_IDirect3DDevice9_ValidateDevice(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::ValidateDevice", 1);
+    d3d_trace(c, "IDirect3DDevice9::ValidateDevice", 1);
     auto r = bridge_call(self, &IDirect3DDevice9::ValidateDevice, GPTR(ARG(1)));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DDevice9_SetPaletteEntries(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetPaletteEntries", 2);
+    d3d_trace(c, "IDirect3DDevice9::SetPaletteEntries", 2);
     auto r = bridge_call(self, &IDirect3DDevice9::SetPaletteEntries, ARG(1), GPTR(ARG(2)));
     RET((uint32_t)r, 3);
 }
 
 static void B_IDirect3DDevice9_GetPaletteEntries(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetPaletteEntries", 2);
+    d3d_trace(c, "IDirect3DDevice9::GetPaletteEntries", 2);
     auto r = bridge_call(self, &IDirect3DDevice9::GetPaletteEntries, ARG(1), GPTR(ARG(2)));
     RET((uint32_t)r, 3);
 }
 
 static void B_IDirect3DDevice9_SetCurrentTexturePalette(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetCurrentTexturePalette", 1);
+    d3d_trace(c, "IDirect3DDevice9::SetCurrentTexturePalette", 1);
     auto r = bridge_call(self, &IDirect3DDevice9::SetCurrentTexturePalette, ARG(1));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DDevice9_GetCurrentTexturePalette(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetCurrentTexturePalette", 1);
+    d3d_trace(c, "IDirect3DDevice9::GetCurrentTexturePalette", 1);
     auto r = bridge_call(self, &IDirect3DDevice9::GetCurrentTexturePalette, GPTR(ARG(1)));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DDevice9_SetScissorRect(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetScissorRect", 1);
+    d3d_trace(c, "IDirect3DDevice9::SetScissorRect", 1);
     auto r = bridge_call(self, &IDirect3DDevice9::SetScissorRect, GPTR(ARG(1)));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DDevice9_GetScissorRect(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetScissorRect", 1);
+    d3d_trace(c, "IDirect3DDevice9::GetScissorRect", 1);
     auto r = bridge_call(self, &IDirect3DDevice9::GetScissorRect, GPTR(ARG(1)));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DDevice9_SetSoftwareVertexProcessing(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetSoftwareVertexProcessing", 1);
+    d3d_trace(c, "IDirect3DDevice9::SetSoftwareVertexProcessing", 1);
     auto r = bridge_call(self, &IDirect3DDevice9::SetSoftwareVertexProcessing, ARG(1));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DDevice9_GetSoftwareVertexProcessing(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetSoftwareVertexProcessing", 0);
+    d3d_trace(c, "IDirect3DDevice9::GetSoftwareVertexProcessing", 0);
     auto r = bridge_call(self, &IDirect3DDevice9::GetSoftwareVertexProcessing);
     RET((uint32_t)r, 1);
 }
 
 static void B_IDirect3DDevice9_SetNPatchMode(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetNPatchMode", 1);
+    d3d_trace(c, "IDirect3DDevice9::SetNPatchMode", 1);
     auto r = bridge_call(self, &IDirect3DDevice9::SetNPatchMode, ARGF(1));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DDevice9_DrawPrimitive(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::DrawPrimitive", 3);
+    d3d_trace(c, "IDirect3DDevice9::DrawPrimitive", 3);
     if (g_bisect && d3d_skip_draw()) { RET(0, 4); return; }
     d3d9_count_draw();  /* per-frame draw total, see d3d9_bridge.cpp */
     auto r = bridge_call(self, &IDirect3DDevice9::DrawPrimitive, ARG(1), ARG(2), ARG(3));
@@ -578,7 +578,7 @@ static void B_IDirect3DDevice9_DrawPrimitive(CPU *c) {
 
 static void B_IDirect3DDevice9_DrawIndexedPrimitive(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::DrawIndexedPrimitive", 6);
+    d3d_trace(c, "IDirect3DDevice9::DrawIndexedPrimitive", 6);
     if (g_bisect && d3d_skip_draw()) { RET(0, 7); return; }
     d3d9_count_draw();  /* per-frame draw total, see d3d9_bridge.cpp */
     auto r = bridge_call(self, &IDirect3DDevice9::DrawIndexedPrimitive, ARG(1), (INT)ARG(2), ARG(3), ARG(4), ARG(5), ARG(6));
@@ -587,7 +587,7 @@ static void B_IDirect3DDevice9_DrawIndexedPrimitive(CPU *c) {
 
 static void B_IDirect3DDevice9_DrawPrimitiveUP(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::DrawPrimitiveUP", 4);
+    d3d_trace(c, "IDirect3DDevice9::DrawPrimitiveUP", 4);
     if (g_bisect && d3d_skip_draw()) { RET(0, 5); return; }
     d3d9_count_draw();  /* per-frame draw total, see d3d9_bridge.cpp */
     auto r = bridge_call(self, &IDirect3DDevice9::DrawPrimitiveUP, ARG(1), ARG(2), GPTR(ARG(3)), ARG(4));
@@ -596,7 +596,7 @@ static void B_IDirect3DDevice9_DrawPrimitiveUP(CPU *c) {
 
 static void B_IDirect3DDevice9_DrawIndexedPrimitiveUP(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::DrawIndexedPrimitiveUP", 8);
+    d3d_trace(c, "IDirect3DDevice9::DrawIndexedPrimitiveUP", 8);
     if (g_bisect && d3d_skip_draw()) { RET(0, 9); return; }
     d3d9_count_draw();  /* per-frame draw total, see d3d9_bridge.cpp */
     auto r = bridge_call(self, &IDirect3DDevice9::DrawIndexedPrimitiveUP, ARG(1), ARG(2), ARG(3), ARG(4), GPTR(ARG(5)), ARG(6), GPTR(ARG(7)), ARG(8));
@@ -605,14 +605,14 @@ static void B_IDirect3DDevice9_DrawIndexedPrimitiveUP(CPU *c) {
 
 static void B_IDirect3DDevice9_ProcessVertices(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::ProcessVertices", 6);
+    d3d_trace(c, "IDirect3DDevice9::ProcessVertices", 6);
     auto r = bridge_call(self, &IDirect3DDevice9::ProcessVertices, ARG(1), ARG(2), ARG(3), (IDirect3DVertexBuffer9 *)com_host(ARG(4)), (IDirect3DVertexDeclaration9 *)com_host(ARG(5)), ARG(6));
     RET((uint32_t)r, 7);
 }
 
 static void B_IDirect3DDevice9_CreateVertexDeclaration(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::CreateVertexDeclaration", 2);
+    d3d_trace(c, "IDirect3DDevice9::CreateVertexDeclaration", 2);
     IDirect3DVertexDeclaration9 *out1 = nullptr;
     auto r = bridge_call(self, &IDirect3DDevice9::CreateVertexDeclaration, GPTR(ARG(1)), &out1);
     if (ARG(2)) M32(ARG(2)) = d3d9_wrap(out1, IFACE_IDirect3DVertexDeclaration9);
@@ -621,14 +621,14 @@ static void B_IDirect3DDevice9_CreateVertexDeclaration(CPU *c) {
 
 static void B_IDirect3DDevice9_SetVertexDeclaration(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetVertexDeclaration", 1);
+    d3d_trace(c, "IDirect3DDevice9::SetVertexDeclaration", 1);
     auto r = bridge_call(self, &IDirect3DDevice9::SetVertexDeclaration, (IDirect3DVertexDeclaration9 *)com_host(ARG(1)));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DDevice9_GetVertexDeclaration(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetVertexDeclaration", 1);
+    d3d_trace(c, "IDirect3DDevice9::GetVertexDeclaration", 1);
     IDirect3DVertexDeclaration9 *out0 = nullptr;
     auto r = bridge_call(self, &IDirect3DDevice9::GetVertexDeclaration, &out0);
     if (ARG(1)) M32(ARG(1)) = d3d9_wrap(out0, IFACE_IDirect3DVertexDeclaration9);
@@ -637,21 +637,21 @@ static void B_IDirect3DDevice9_GetVertexDeclaration(CPU *c) {
 
 static void B_IDirect3DDevice9_SetFVF(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetFVF", 1);
+    d3d_trace(c, "IDirect3DDevice9::SetFVF", 1);
     auto r = bridge_call(self, &IDirect3DDevice9::SetFVF, ARG(1));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DDevice9_GetFVF(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetFVF", 1);
+    d3d_trace(c, "IDirect3DDevice9::GetFVF", 1);
     auto r = bridge_call(self, &IDirect3DDevice9::GetFVF, GPTR(ARG(1)));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DDevice9_CreateVertexShader(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::CreateVertexShader", 2);
+    d3d_trace(c, "IDirect3DDevice9::CreateVertexShader", 2);
     IDirect3DVertexShader9 *out1 = nullptr;
     auto r = bridge_call(self, &IDirect3DDevice9::CreateVertexShader, GPTR(ARG(1)), &out1);
     if (ARG(2)) M32(ARG(2)) = d3d9_wrap(out1, IFACE_IDirect3DVertexShader9);
@@ -660,14 +660,14 @@ static void B_IDirect3DDevice9_CreateVertexShader(CPU *c) {
 
 static void B_IDirect3DDevice9_SetVertexShader(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetVertexShader", 1);
+    d3d_trace(c, "IDirect3DDevice9::SetVertexShader", 1);
     auto r = bridge_call(self, &IDirect3DDevice9::SetVertexShader, (IDirect3DVertexShader9 *)com_host(ARG(1)));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DDevice9_GetVertexShader(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetVertexShader", 1);
+    d3d_trace(c, "IDirect3DDevice9::GetVertexShader", 1);
     IDirect3DVertexShader9 *out0 = nullptr;
     auto r = bridge_call(self, &IDirect3DDevice9::GetVertexShader, &out0);
     if (ARG(1)) M32(ARG(1)) = d3d9_wrap(out0, IFACE_IDirect3DVertexShader9);
@@ -676,56 +676,56 @@ static void B_IDirect3DDevice9_GetVertexShader(CPU *c) {
 
 static void B_IDirect3DDevice9_SetVertexShaderConstantF(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetVertexShaderConstantF", 3);
+    d3d_trace(c, "IDirect3DDevice9::SetVertexShaderConstantF", 3);
     auto r = bridge_call(self, &IDirect3DDevice9::SetVertexShaderConstantF, ARG(1), GPTR(ARG(2)), ARG(3));
     RET((uint32_t)r, 4);
 }
 
 static void B_IDirect3DDevice9_GetVertexShaderConstantF(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetVertexShaderConstantF", 3);
+    d3d_trace(c, "IDirect3DDevice9::GetVertexShaderConstantF", 3);
     auto r = bridge_call(self, &IDirect3DDevice9::GetVertexShaderConstantF, ARG(1), GPTR(ARG(2)), ARG(3));
     RET((uint32_t)r, 4);
 }
 
 static void B_IDirect3DDevice9_SetVertexShaderConstantI(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetVertexShaderConstantI", 3);
+    d3d_trace(c, "IDirect3DDevice9::SetVertexShaderConstantI", 3);
     auto r = bridge_call(self, &IDirect3DDevice9::SetVertexShaderConstantI, ARG(1), GPTR(ARG(2)), ARG(3));
     RET((uint32_t)r, 4);
 }
 
 static void B_IDirect3DDevice9_GetVertexShaderConstantI(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetVertexShaderConstantI", 3);
+    d3d_trace(c, "IDirect3DDevice9::GetVertexShaderConstantI", 3);
     auto r = bridge_call(self, &IDirect3DDevice9::GetVertexShaderConstantI, ARG(1), GPTR(ARG(2)), ARG(3));
     RET((uint32_t)r, 4);
 }
 
 static void B_IDirect3DDevice9_SetVertexShaderConstantB(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetVertexShaderConstantB", 3);
+    d3d_trace(c, "IDirect3DDevice9::SetVertexShaderConstantB", 3);
     auto r = bridge_call(self, &IDirect3DDevice9::SetVertexShaderConstantB, ARG(1), GPTR(ARG(2)), ARG(3));
     RET((uint32_t)r, 4);
 }
 
 static void B_IDirect3DDevice9_GetVertexShaderConstantB(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetVertexShaderConstantB", 3);
+    d3d_trace(c, "IDirect3DDevice9::GetVertexShaderConstantB", 3);
     auto r = bridge_call(self, &IDirect3DDevice9::GetVertexShaderConstantB, ARG(1), GPTR(ARG(2)), ARG(3));
     RET((uint32_t)r, 4);
 }
 
 static void B_IDirect3DDevice9_SetStreamSource(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetStreamSource", 4);
+    d3d_trace(c, "IDirect3DDevice9::SetStreamSource", 4);
     auto r = bridge_call(self, &IDirect3DDevice9::SetStreamSource, ARG(1), (IDirect3DVertexBuffer9 *)com_host(ARG(2)), ARG(3), ARG(4));
     RET((uint32_t)r, 5);
 }
 
 static void B_IDirect3DDevice9_GetStreamSource(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetStreamSource", 4);
+    d3d_trace(c, "IDirect3DDevice9::GetStreamSource", 4);
     IDirect3DVertexBuffer9 *out1 = nullptr;
     auto r = bridge_call(self, &IDirect3DDevice9::GetStreamSource, ARG(1), &out1, GPTR(ARG(3)), GPTR(ARG(4)));
     if (ARG(2)) M32(ARG(2)) = d3d9_wrap(out1, IFACE_IDirect3DVertexBuffer9);
@@ -734,28 +734,28 @@ static void B_IDirect3DDevice9_GetStreamSource(CPU *c) {
 
 static void B_IDirect3DDevice9_SetStreamSourceFreq(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetStreamSourceFreq", 2);
+    d3d_trace(c, "IDirect3DDevice9::SetStreamSourceFreq", 2);
     auto r = bridge_call(self, &IDirect3DDevice9::SetStreamSourceFreq, ARG(1), ARG(2));
     RET((uint32_t)r, 3);
 }
 
 static void B_IDirect3DDevice9_GetStreamSourceFreq(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetStreamSourceFreq", 2);
+    d3d_trace(c, "IDirect3DDevice9::GetStreamSourceFreq", 2);
     auto r = bridge_call(self, &IDirect3DDevice9::GetStreamSourceFreq, ARG(1), GPTR(ARG(2)));
     RET((uint32_t)r, 3);
 }
 
 static void B_IDirect3DDevice9_SetIndices(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetIndices", 1);
+    d3d_trace(c, "IDirect3DDevice9::SetIndices", 1);
     auto r = bridge_call(self, &IDirect3DDevice9::SetIndices, (IDirect3DIndexBuffer9 *)com_host(ARG(1)));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DDevice9_GetIndices(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetIndices", 1);
+    d3d_trace(c, "IDirect3DDevice9::GetIndices", 1);
     IDirect3DIndexBuffer9 *out0 = nullptr;
     auto r = bridge_call(self, &IDirect3DDevice9::GetIndices, &out0);
     if (ARG(1)) M32(ARG(1)) = d3d9_wrap(out0, IFACE_IDirect3DIndexBuffer9);
@@ -764,7 +764,7 @@ static void B_IDirect3DDevice9_GetIndices(CPU *c) {
 
 static void B_IDirect3DDevice9_CreatePixelShader(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::CreatePixelShader", 2);
+    d3d_trace(c, "IDirect3DDevice9::CreatePixelShader", 2);
     IDirect3DPixelShader9 *out1 = nullptr;
     auto r = bridge_call(self, &IDirect3DDevice9::CreatePixelShader, GPTR(ARG(1)), &out1);
     if (ARG(2)) M32(ARG(2)) = d3d9_wrap(out1, IFACE_IDirect3DPixelShader9);
@@ -773,14 +773,14 @@ static void B_IDirect3DDevice9_CreatePixelShader(CPU *c) {
 
 static void B_IDirect3DDevice9_SetPixelShader(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetPixelShader", 1);
+    d3d_trace(c, "IDirect3DDevice9::SetPixelShader", 1);
     auto r = bridge_call(self, &IDirect3DDevice9::SetPixelShader, (IDirect3DPixelShader9 *)com_host(ARG(1)));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DDevice9_GetPixelShader(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetPixelShader", 1);
+    d3d_trace(c, "IDirect3DDevice9::GetPixelShader", 1);
     IDirect3DPixelShader9 *out0 = nullptr;
     auto r = bridge_call(self, &IDirect3DDevice9::GetPixelShader, &out0);
     if (ARG(1)) M32(ARG(1)) = d3d9_wrap(out0, IFACE_IDirect3DPixelShader9);
@@ -789,70 +789,70 @@ static void B_IDirect3DDevice9_GetPixelShader(CPU *c) {
 
 static void B_IDirect3DDevice9_SetPixelShaderConstantF(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetPixelShaderConstantF", 3);
+    d3d_trace(c, "IDirect3DDevice9::SetPixelShaderConstantF", 3);
     auto r = bridge_call(self, &IDirect3DDevice9::SetPixelShaderConstantF, ARG(1), GPTR(ARG(2)), ARG(3));
     RET((uint32_t)r, 4);
 }
 
 static void B_IDirect3DDevice9_GetPixelShaderConstantF(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetPixelShaderConstantF", 3);
+    d3d_trace(c, "IDirect3DDevice9::GetPixelShaderConstantF", 3);
     auto r = bridge_call(self, &IDirect3DDevice9::GetPixelShaderConstantF, ARG(1), GPTR(ARG(2)), ARG(3));
     RET((uint32_t)r, 4);
 }
 
 static void B_IDirect3DDevice9_SetPixelShaderConstantI(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetPixelShaderConstantI", 3);
+    d3d_trace(c, "IDirect3DDevice9::SetPixelShaderConstantI", 3);
     auto r = bridge_call(self, &IDirect3DDevice9::SetPixelShaderConstantI, ARG(1), GPTR(ARG(2)), ARG(3));
     RET((uint32_t)r, 4);
 }
 
 static void B_IDirect3DDevice9_GetPixelShaderConstantI(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetPixelShaderConstantI", 3);
+    d3d_trace(c, "IDirect3DDevice9::GetPixelShaderConstantI", 3);
     auto r = bridge_call(self, &IDirect3DDevice9::GetPixelShaderConstantI, ARG(1), GPTR(ARG(2)), ARG(3));
     RET((uint32_t)r, 4);
 }
 
 static void B_IDirect3DDevice9_SetPixelShaderConstantB(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::SetPixelShaderConstantB", 3);
+    d3d_trace(c, "IDirect3DDevice9::SetPixelShaderConstantB", 3);
     auto r = bridge_call(self, &IDirect3DDevice9::SetPixelShaderConstantB, ARG(1), GPTR(ARG(2)), ARG(3));
     RET((uint32_t)r, 4);
 }
 
 static void B_IDirect3DDevice9_GetPixelShaderConstantB(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::GetPixelShaderConstantB", 3);
+    d3d_trace(c, "IDirect3DDevice9::GetPixelShaderConstantB", 3);
     auto r = bridge_call(self, &IDirect3DDevice9::GetPixelShaderConstantB, ARG(1), GPTR(ARG(2)), ARG(3));
     RET((uint32_t)r, 4);
 }
 
 static void B_IDirect3DDevice9_DrawRectPatch(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::DrawRectPatch", 3);
+    d3d_trace(c, "IDirect3DDevice9::DrawRectPatch", 3);
     auto r = bridge_call(self, &IDirect3DDevice9::DrawRectPatch, ARG(1), GPTR(ARG(2)), GPTR(ARG(3)));
     RET((uint32_t)r, 4);
 }
 
 static void B_IDirect3DDevice9_DrawTriPatch(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::DrawTriPatch", 3);
+    d3d_trace(c, "IDirect3DDevice9::DrawTriPatch", 3);
     auto r = bridge_call(self, &IDirect3DDevice9::DrawTriPatch, ARG(1), GPTR(ARG(2)), GPTR(ARG(3)));
     RET((uint32_t)r, 4);
 }
 
 static void B_IDirect3DDevice9_DeletePatch(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::DeletePatch", 1);
+    d3d_trace(c, "IDirect3DDevice9::DeletePatch", 1);
     auto r = bridge_call(self, &IDirect3DDevice9::DeletePatch, ARG(1));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DDevice9_CreateQuery(CPU *c) {
     IDirect3DDevice9 *self = (IDirect3DDevice9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DDevice9::CreateQuery", 2);
+    d3d_trace(c, "IDirect3DDevice9::CreateQuery", 2);
     IDirect3DQuery9 *out1 = nullptr;
     auto r = bridge_call(self, &IDirect3DDevice9::CreateQuery, ARG(1), &out1);
     if (ARG(2)) M32(ARG(2)) = d3d9_wrap(out1, IFACE_IDirect3DQuery9);
@@ -864,14 +864,14 @@ static void B_IDirect3DSwapChain9_AddRef(CPU *c) { com_AddRef(c); }
 static void B_IDirect3DSwapChain9_Release(CPU *c) { com_Release(c); }
 static void B_IDirect3DSwapChain9_GetFrontBufferData(CPU *c) {
     IDirect3DSwapChain9 *self = (IDirect3DSwapChain9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DSwapChain9::GetFrontBufferData", 1);
+    d3d_trace(c, "IDirect3DSwapChain9::GetFrontBufferData", 1);
     auto r = bridge_call(self, &IDirect3DSwapChain9::GetFrontBufferData, (IDirect3DSurface9 *)com_host(ARG(1)));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DSwapChain9_GetBackBuffer(CPU *c) {
     IDirect3DSwapChain9 *self = (IDirect3DSwapChain9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DSwapChain9::GetBackBuffer", 3);
+    d3d_trace(c, "IDirect3DSwapChain9::GetBackBuffer", 3);
     IDirect3DSurface9 *out2 = nullptr;
     auto r = bridge_call(self, &IDirect3DSwapChain9::GetBackBuffer, ARG(1), ARG(2), &out2);
     if (ARG(3)) M32(ARG(3)) = d3d9_wrap(out2, IFACE_IDirect3DSurface9);
@@ -880,21 +880,21 @@ static void B_IDirect3DSwapChain9_GetBackBuffer(CPU *c) {
 
 static void B_IDirect3DSwapChain9_GetRasterStatus(CPU *c) {
     IDirect3DSwapChain9 *self = (IDirect3DSwapChain9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DSwapChain9::GetRasterStatus", 1);
+    d3d_trace(c, "IDirect3DSwapChain9::GetRasterStatus", 1);
     auto r = bridge_call(self, &IDirect3DSwapChain9::GetRasterStatus, GPTR(ARG(1)));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DSwapChain9_GetDisplayMode(CPU *c) {
     IDirect3DSwapChain9 *self = (IDirect3DSwapChain9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DSwapChain9::GetDisplayMode", 1);
+    d3d_trace(c, "IDirect3DSwapChain9::GetDisplayMode", 1);
     auto r = bridge_call(self, &IDirect3DSwapChain9::GetDisplayMode, GPTR(ARG(1)));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DSwapChain9_GetDevice(CPU *c) {
     IDirect3DSwapChain9 *self = (IDirect3DSwapChain9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DSwapChain9::GetDevice", 1);
+    d3d_trace(c, "IDirect3DSwapChain9::GetDevice", 1);
     IDirect3DDevice9 *out0 = nullptr;
     auto r = bridge_call(self, &IDirect3DSwapChain9::GetDevice, &out0);
     if (ARG(1)) M32(ARG(1)) = d3d9_wrap(out0, IFACE_IDirect3DDevice9);
@@ -906,7 +906,7 @@ static void B_IDirect3DTexture9_AddRef(CPU *c) { com_AddRef(c); }
 static void B_IDirect3DTexture9_Release(CPU *c) { com_Release(c); }
 static void B_IDirect3DTexture9_GetDevice(CPU *c) {
     IDirect3DTexture9 *self = (IDirect3DTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DTexture9::GetDevice", 1);
+    d3d_trace(c, "IDirect3DTexture9::GetDevice", 1);
     IDirect3DDevice9 *out0 = nullptr;
     auto r = bridge_call(self, &IDirect3DTexture9::GetDevice, &out0);
     if (ARG(1)) M32(ARG(1)) = d3d9_wrap(out0, IFACE_IDirect3DDevice9);
@@ -915,98 +915,98 @@ static void B_IDirect3DTexture9_GetDevice(CPU *c) {
 
 static void B_IDirect3DTexture9_SetPrivateData(CPU *c) {
     IDirect3DTexture9 *self = (IDirect3DTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DTexture9::SetPrivateData", 4);
+    d3d_trace(c, "IDirect3DTexture9::SetPrivateData", 4);
     auto r = bridge_call(self, &IDirect3DTexture9::SetPrivateData, GPTR(ARG(1)), GPTR(ARG(2)), ARG(3), ARG(4));
     RET((uint32_t)r, 5);
 }
 
 static void B_IDirect3DTexture9_GetPrivateData(CPU *c) {
     IDirect3DTexture9 *self = (IDirect3DTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DTexture9::GetPrivateData", 3);
+    d3d_trace(c, "IDirect3DTexture9::GetPrivateData", 3);
     auto r = bridge_call(self, &IDirect3DTexture9::GetPrivateData, GPTR(ARG(1)), GPTR(ARG(2)), GPTR(ARG(3)));
     RET((uint32_t)r, 4);
 }
 
 static void B_IDirect3DTexture9_FreePrivateData(CPU *c) {
     IDirect3DTexture9 *self = (IDirect3DTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DTexture9::FreePrivateData", 1);
+    d3d_trace(c, "IDirect3DTexture9::FreePrivateData", 1);
     auto r = bridge_call(self, &IDirect3DTexture9::FreePrivateData, GPTR(ARG(1)));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DTexture9_SetPriority(CPU *c) {
     IDirect3DTexture9 *self = (IDirect3DTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DTexture9::SetPriority", 1);
+    d3d_trace(c, "IDirect3DTexture9::SetPriority", 1);
     auto r = bridge_call(self, &IDirect3DTexture9::SetPriority, ARG(1));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DTexture9_GetPriority(CPU *c) {
     IDirect3DTexture9 *self = (IDirect3DTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DTexture9::GetPriority", 0);
+    d3d_trace(c, "IDirect3DTexture9::GetPriority", 0);
     auto r = bridge_call(self, &IDirect3DTexture9::GetPriority);
     RET((uint32_t)r, 1);
 }
 
 static void B_IDirect3DTexture9_PreLoad(CPU *c) {
     IDirect3DTexture9 *self = (IDirect3DTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DTexture9::PreLoad", 0);
+    d3d_trace(c, "IDirect3DTexture9::PreLoad", 0);
     bridge_call(self, &IDirect3DTexture9::PreLoad);
     RET(0, 1);
 }
 
 static void B_IDirect3DTexture9_GetType(CPU *c) {
     IDirect3DTexture9 *self = (IDirect3DTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DTexture9::GetType", 0);
+    d3d_trace(c, "IDirect3DTexture9::GetType", 0);
     auto r = bridge_call(self, &IDirect3DTexture9::GetType);
     RET((uint32_t)r, 1);
 }
 
 static void B_IDirect3DTexture9_SetLOD(CPU *c) {
     IDirect3DTexture9 *self = (IDirect3DTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DTexture9::SetLOD", 1);
+    d3d_trace(c, "IDirect3DTexture9::SetLOD", 1);
     auto r = bridge_call(self, &IDirect3DTexture9::SetLOD, ARG(1));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DTexture9_GetLOD(CPU *c) {
     IDirect3DTexture9 *self = (IDirect3DTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DTexture9::GetLOD", 0);
+    d3d_trace(c, "IDirect3DTexture9::GetLOD", 0);
     auto r = bridge_call(self, &IDirect3DTexture9::GetLOD);
     RET((uint32_t)r, 1);
 }
 
 static void B_IDirect3DTexture9_GetLevelCount(CPU *c) {
     IDirect3DTexture9 *self = (IDirect3DTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DTexture9::GetLevelCount", 0);
+    d3d_trace(c, "IDirect3DTexture9::GetLevelCount", 0);
     auto r = bridge_call(self, &IDirect3DTexture9::GetLevelCount);
     RET((uint32_t)r, 1);
 }
 
 static void B_IDirect3DTexture9_SetAutoGenFilterType(CPU *c) {
     IDirect3DTexture9 *self = (IDirect3DTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DTexture9::SetAutoGenFilterType", 1);
+    d3d_trace(c, "IDirect3DTexture9::SetAutoGenFilterType", 1);
     auto r = bridge_call(self, &IDirect3DTexture9::SetAutoGenFilterType, ARG(1));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DTexture9_GetAutoGenFilterType(CPU *c) {
     IDirect3DTexture9 *self = (IDirect3DTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DTexture9::GetAutoGenFilterType", 0);
+    d3d_trace(c, "IDirect3DTexture9::GetAutoGenFilterType", 0);
     auto r = bridge_call(self, &IDirect3DTexture9::GetAutoGenFilterType);
     RET((uint32_t)r, 1);
 }
 
 static void B_IDirect3DTexture9_GenerateMipSubLevels(CPU *c) {
     IDirect3DTexture9 *self = (IDirect3DTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DTexture9::GenerateMipSubLevels", 0);
+    d3d_trace(c, "IDirect3DTexture9::GenerateMipSubLevels", 0);
     bridge_call(self, &IDirect3DTexture9::GenerateMipSubLevels);
     RET(0, 1);
 }
 
 static void B_IDirect3DTexture9_AddDirtyRect(CPU *c) {
     IDirect3DTexture9 *self = (IDirect3DTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DTexture9::AddDirtyRect", 1);
+    d3d_trace(c, "IDirect3DTexture9::AddDirtyRect", 1);
     auto r = bridge_call(self, &IDirect3DTexture9::AddDirtyRect, GPTR(ARG(1)));
     RET((uint32_t)r, 2);
 }
@@ -1016,7 +1016,7 @@ static void B_IDirect3DCubeTexture9_AddRef(CPU *c) { com_AddRef(c); }
 static void B_IDirect3DCubeTexture9_Release(CPU *c) { com_Release(c); }
 static void B_IDirect3DCubeTexture9_GetDevice(CPU *c) {
     IDirect3DCubeTexture9 *self = (IDirect3DCubeTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DCubeTexture9::GetDevice", 1);
+    d3d_trace(c, "IDirect3DCubeTexture9::GetDevice", 1);
     IDirect3DDevice9 *out0 = nullptr;
     auto r = bridge_call(self, &IDirect3DCubeTexture9::GetDevice, &out0);
     if (ARG(1)) M32(ARG(1)) = d3d9_wrap(out0, IFACE_IDirect3DDevice9);
@@ -1025,98 +1025,98 @@ static void B_IDirect3DCubeTexture9_GetDevice(CPU *c) {
 
 static void B_IDirect3DCubeTexture9_SetPrivateData(CPU *c) {
     IDirect3DCubeTexture9 *self = (IDirect3DCubeTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DCubeTexture9::SetPrivateData", 4);
+    d3d_trace(c, "IDirect3DCubeTexture9::SetPrivateData", 4);
     auto r = bridge_call(self, &IDirect3DCubeTexture9::SetPrivateData, GPTR(ARG(1)), GPTR(ARG(2)), ARG(3), ARG(4));
     RET((uint32_t)r, 5);
 }
 
 static void B_IDirect3DCubeTexture9_GetPrivateData(CPU *c) {
     IDirect3DCubeTexture9 *self = (IDirect3DCubeTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DCubeTexture9::GetPrivateData", 3);
+    d3d_trace(c, "IDirect3DCubeTexture9::GetPrivateData", 3);
     auto r = bridge_call(self, &IDirect3DCubeTexture9::GetPrivateData, GPTR(ARG(1)), GPTR(ARG(2)), GPTR(ARG(3)));
     RET((uint32_t)r, 4);
 }
 
 static void B_IDirect3DCubeTexture9_FreePrivateData(CPU *c) {
     IDirect3DCubeTexture9 *self = (IDirect3DCubeTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DCubeTexture9::FreePrivateData", 1);
+    d3d_trace(c, "IDirect3DCubeTexture9::FreePrivateData", 1);
     auto r = bridge_call(self, &IDirect3DCubeTexture9::FreePrivateData, GPTR(ARG(1)));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DCubeTexture9_SetPriority(CPU *c) {
     IDirect3DCubeTexture9 *self = (IDirect3DCubeTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DCubeTexture9::SetPriority", 1);
+    d3d_trace(c, "IDirect3DCubeTexture9::SetPriority", 1);
     auto r = bridge_call(self, &IDirect3DCubeTexture9::SetPriority, ARG(1));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DCubeTexture9_GetPriority(CPU *c) {
     IDirect3DCubeTexture9 *self = (IDirect3DCubeTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DCubeTexture9::GetPriority", 0);
+    d3d_trace(c, "IDirect3DCubeTexture9::GetPriority", 0);
     auto r = bridge_call(self, &IDirect3DCubeTexture9::GetPriority);
     RET((uint32_t)r, 1);
 }
 
 static void B_IDirect3DCubeTexture9_PreLoad(CPU *c) {
     IDirect3DCubeTexture9 *self = (IDirect3DCubeTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DCubeTexture9::PreLoad", 0);
+    d3d_trace(c, "IDirect3DCubeTexture9::PreLoad", 0);
     bridge_call(self, &IDirect3DCubeTexture9::PreLoad);
     RET(0, 1);
 }
 
 static void B_IDirect3DCubeTexture9_GetType(CPU *c) {
     IDirect3DCubeTexture9 *self = (IDirect3DCubeTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DCubeTexture9::GetType", 0);
+    d3d_trace(c, "IDirect3DCubeTexture9::GetType", 0);
     auto r = bridge_call(self, &IDirect3DCubeTexture9::GetType);
     RET((uint32_t)r, 1);
 }
 
 static void B_IDirect3DCubeTexture9_SetLOD(CPU *c) {
     IDirect3DCubeTexture9 *self = (IDirect3DCubeTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DCubeTexture9::SetLOD", 1);
+    d3d_trace(c, "IDirect3DCubeTexture9::SetLOD", 1);
     auto r = bridge_call(self, &IDirect3DCubeTexture9::SetLOD, ARG(1));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DCubeTexture9_GetLOD(CPU *c) {
     IDirect3DCubeTexture9 *self = (IDirect3DCubeTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DCubeTexture9::GetLOD", 0);
+    d3d_trace(c, "IDirect3DCubeTexture9::GetLOD", 0);
     auto r = bridge_call(self, &IDirect3DCubeTexture9::GetLOD);
     RET((uint32_t)r, 1);
 }
 
 static void B_IDirect3DCubeTexture9_GetLevelCount(CPU *c) {
     IDirect3DCubeTexture9 *self = (IDirect3DCubeTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DCubeTexture9::GetLevelCount", 0);
+    d3d_trace(c, "IDirect3DCubeTexture9::GetLevelCount", 0);
     auto r = bridge_call(self, &IDirect3DCubeTexture9::GetLevelCount);
     RET((uint32_t)r, 1);
 }
 
 static void B_IDirect3DCubeTexture9_SetAutoGenFilterType(CPU *c) {
     IDirect3DCubeTexture9 *self = (IDirect3DCubeTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DCubeTexture9::SetAutoGenFilterType", 1);
+    d3d_trace(c, "IDirect3DCubeTexture9::SetAutoGenFilterType", 1);
     auto r = bridge_call(self, &IDirect3DCubeTexture9::SetAutoGenFilterType, ARG(1));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DCubeTexture9_GetAutoGenFilterType(CPU *c) {
     IDirect3DCubeTexture9 *self = (IDirect3DCubeTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DCubeTexture9::GetAutoGenFilterType", 0);
+    d3d_trace(c, "IDirect3DCubeTexture9::GetAutoGenFilterType", 0);
     auto r = bridge_call(self, &IDirect3DCubeTexture9::GetAutoGenFilterType);
     RET((uint32_t)r, 1);
 }
 
 static void B_IDirect3DCubeTexture9_GenerateMipSubLevels(CPU *c) {
     IDirect3DCubeTexture9 *self = (IDirect3DCubeTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DCubeTexture9::GenerateMipSubLevels", 0);
+    d3d_trace(c, "IDirect3DCubeTexture9::GenerateMipSubLevels", 0);
     bridge_call(self, &IDirect3DCubeTexture9::GenerateMipSubLevels);
     RET(0, 1);
 }
 
 static void B_IDirect3DCubeTexture9_AddDirtyRect(CPU *c) {
     IDirect3DCubeTexture9 *self = (IDirect3DCubeTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DCubeTexture9::AddDirtyRect", 2);
+    d3d_trace(c, "IDirect3DCubeTexture9::AddDirtyRect", 2);
     auto r = bridge_call(self, &IDirect3DCubeTexture9::AddDirtyRect, ARG(1), GPTR(ARG(2)));
     RET((uint32_t)r, 3);
 }
@@ -1126,7 +1126,7 @@ static void B_IDirect3DVolumeTexture9_AddRef(CPU *c) { com_AddRef(c); }
 static void B_IDirect3DVolumeTexture9_Release(CPU *c) { com_Release(c); }
 static void B_IDirect3DVolumeTexture9_GetDevice(CPU *c) {
     IDirect3DVolumeTexture9 *self = (IDirect3DVolumeTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVolumeTexture9::GetDevice", 1);
+    d3d_trace(c, "IDirect3DVolumeTexture9::GetDevice", 1);
     IDirect3DDevice9 *out0 = nullptr;
     auto r = bridge_call(self, &IDirect3DVolumeTexture9::GetDevice, &out0);
     if (ARG(1)) M32(ARG(1)) = d3d9_wrap(out0, IFACE_IDirect3DDevice9);
@@ -1135,105 +1135,105 @@ static void B_IDirect3DVolumeTexture9_GetDevice(CPU *c) {
 
 static void B_IDirect3DVolumeTexture9_SetPrivateData(CPU *c) {
     IDirect3DVolumeTexture9 *self = (IDirect3DVolumeTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVolumeTexture9::SetPrivateData", 4);
+    d3d_trace(c, "IDirect3DVolumeTexture9::SetPrivateData", 4);
     auto r = bridge_call(self, &IDirect3DVolumeTexture9::SetPrivateData, GPTR(ARG(1)), GPTR(ARG(2)), ARG(3), ARG(4));
     RET((uint32_t)r, 5);
 }
 
 static void B_IDirect3DVolumeTexture9_GetPrivateData(CPU *c) {
     IDirect3DVolumeTexture9 *self = (IDirect3DVolumeTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVolumeTexture9::GetPrivateData", 3);
+    d3d_trace(c, "IDirect3DVolumeTexture9::GetPrivateData", 3);
     auto r = bridge_call(self, &IDirect3DVolumeTexture9::GetPrivateData, GPTR(ARG(1)), GPTR(ARG(2)), GPTR(ARG(3)));
     RET((uint32_t)r, 4);
 }
 
 static void B_IDirect3DVolumeTexture9_FreePrivateData(CPU *c) {
     IDirect3DVolumeTexture9 *self = (IDirect3DVolumeTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVolumeTexture9::FreePrivateData", 1);
+    d3d_trace(c, "IDirect3DVolumeTexture9::FreePrivateData", 1);
     auto r = bridge_call(self, &IDirect3DVolumeTexture9::FreePrivateData, GPTR(ARG(1)));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DVolumeTexture9_SetPriority(CPU *c) {
     IDirect3DVolumeTexture9 *self = (IDirect3DVolumeTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVolumeTexture9::SetPriority", 1);
+    d3d_trace(c, "IDirect3DVolumeTexture9::SetPriority", 1);
     auto r = bridge_call(self, &IDirect3DVolumeTexture9::SetPriority, ARG(1));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DVolumeTexture9_GetPriority(CPU *c) {
     IDirect3DVolumeTexture9 *self = (IDirect3DVolumeTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVolumeTexture9::GetPriority", 0);
+    d3d_trace(c, "IDirect3DVolumeTexture9::GetPriority", 0);
     auto r = bridge_call(self, &IDirect3DVolumeTexture9::GetPriority);
     RET((uint32_t)r, 1);
 }
 
 static void B_IDirect3DVolumeTexture9_PreLoad(CPU *c) {
     IDirect3DVolumeTexture9 *self = (IDirect3DVolumeTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVolumeTexture9::PreLoad", 0);
+    d3d_trace(c, "IDirect3DVolumeTexture9::PreLoad", 0);
     bridge_call(self, &IDirect3DVolumeTexture9::PreLoad);
     RET(0, 1);
 }
 
 static void B_IDirect3DVolumeTexture9_GetType(CPU *c) {
     IDirect3DVolumeTexture9 *self = (IDirect3DVolumeTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVolumeTexture9::GetType", 0);
+    d3d_trace(c, "IDirect3DVolumeTexture9::GetType", 0);
     auto r = bridge_call(self, &IDirect3DVolumeTexture9::GetType);
     RET((uint32_t)r, 1);
 }
 
 static void B_IDirect3DVolumeTexture9_SetLOD(CPU *c) {
     IDirect3DVolumeTexture9 *self = (IDirect3DVolumeTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVolumeTexture9::SetLOD", 1);
+    d3d_trace(c, "IDirect3DVolumeTexture9::SetLOD", 1);
     auto r = bridge_call(self, &IDirect3DVolumeTexture9::SetLOD, ARG(1));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DVolumeTexture9_GetLOD(CPU *c) {
     IDirect3DVolumeTexture9 *self = (IDirect3DVolumeTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVolumeTexture9::GetLOD", 0);
+    d3d_trace(c, "IDirect3DVolumeTexture9::GetLOD", 0);
     auto r = bridge_call(self, &IDirect3DVolumeTexture9::GetLOD);
     RET((uint32_t)r, 1);
 }
 
 static void B_IDirect3DVolumeTexture9_GetLevelCount(CPU *c) {
     IDirect3DVolumeTexture9 *self = (IDirect3DVolumeTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVolumeTexture9::GetLevelCount", 0);
+    d3d_trace(c, "IDirect3DVolumeTexture9::GetLevelCount", 0);
     auto r = bridge_call(self, &IDirect3DVolumeTexture9::GetLevelCount);
     RET((uint32_t)r, 1);
 }
 
 static void B_IDirect3DVolumeTexture9_SetAutoGenFilterType(CPU *c) {
     IDirect3DVolumeTexture9 *self = (IDirect3DVolumeTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVolumeTexture9::SetAutoGenFilterType", 1);
+    d3d_trace(c, "IDirect3DVolumeTexture9::SetAutoGenFilterType", 1);
     auto r = bridge_call(self, &IDirect3DVolumeTexture9::SetAutoGenFilterType, ARG(1));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DVolumeTexture9_GetAutoGenFilterType(CPU *c) {
     IDirect3DVolumeTexture9 *self = (IDirect3DVolumeTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVolumeTexture9::GetAutoGenFilterType", 0);
+    d3d_trace(c, "IDirect3DVolumeTexture9::GetAutoGenFilterType", 0);
     auto r = bridge_call(self, &IDirect3DVolumeTexture9::GetAutoGenFilterType);
     RET((uint32_t)r, 1);
 }
 
 static void B_IDirect3DVolumeTexture9_GenerateMipSubLevels(CPU *c) {
     IDirect3DVolumeTexture9 *self = (IDirect3DVolumeTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVolumeTexture9::GenerateMipSubLevels", 0);
+    d3d_trace(c, "IDirect3DVolumeTexture9::GenerateMipSubLevels", 0);
     bridge_call(self, &IDirect3DVolumeTexture9::GenerateMipSubLevels);
     RET(0, 1);
 }
 
 static void B_IDirect3DVolumeTexture9_GetLevelDesc(CPU *c) {
     IDirect3DVolumeTexture9 *self = (IDirect3DVolumeTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVolumeTexture9::GetLevelDesc", 2);
+    d3d_trace(c, "IDirect3DVolumeTexture9::GetLevelDesc", 2);
     auto r = bridge_call(self, &IDirect3DVolumeTexture9::GetLevelDesc, ARG(1), GPTR(ARG(2)));
     RET((uint32_t)r, 3);
 }
 
 static void B_IDirect3DVolumeTexture9_GetVolumeLevel(CPU *c) {
     IDirect3DVolumeTexture9 *self = (IDirect3DVolumeTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVolumeTexture9::GetVolumeLevel", 2);
+    d3d_trace(c, "IDirect3DVolumeTexture9::GetVolumeLevel", 2);
     IDirect3DVolume9 *out1 = nullptr;
     auto r = bridge_call(self, &IDirect3DVolumeTexture9::GetVolumeLevel, ARG(1), &out1);
     if (ARG(2)) M32(ARG(2)) = d3d9_wrap(out1, IFACE_IDirect3DVolume9);
@@ -1242,7 +1242,7 @@ static void B_IDirect3DVolumeTexture9_GetVolumeLevel(CPU *c) {
 
 static void B_IDirect3DVolumeTexture9_AddDirtyBox(CPU *c) {
     IDirect3DVolumeTexture9 *self = (IDirect3DVolumeTexture9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVolumeTexture9::AddDirtyBox", 1);
+    d3d_trace(c, "IDirect3DVolumeTexture9::AddDirtyBox", 1);
     auto r = bridge_call(self, &IDirect3DVolumeTexture9::AddDirtyBox, GPTR(ARG(1)));
     RET((uint32_t)r, 2);
 }
@@ -1252,7 +1252,7 @@ static void B_IDirect3DVolume9_AddRef(CPU *c) { com_AddRef(c); }
 static void B_IDirect3DVolume9_Release(CPU *c) { com_Release(c); }
 static void B_IDirect3DVolume9_GetDevice(CPU *c) {
     IDirect3DVolume9 *self = (IDirect3DVolume9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVolume9::GetDevice", 1);
+    d3d_trace(c, "IDirect3DVolume9::GetDevice", 1);
     IDirect3DDevice9 *out0 = nullptr;
     auto r = bridge_call(self, &IDirect3DVolume9::GetDevice, &out0);
     if (ARG(1)) M32(ARG(1)) = d3d9_wrap(out0, IFACE_IDirect3DDevice9);
@@ -1261,28 +1261,28 @@ static void B_IDirect3DVolume9_GetDevice(CPU *c) {
 
 static void B_IDirect3DVolume9_SetPrivateData(CPU *c) {
     IDirect3DVolume9 *self = (IDirect3DVolume9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVolume9::SetPrivateData", 4);
+    d3d_trace(c, "IDirect3DVolume9::SetPrivateData", 4);
     auto r = bridge_call(self, &IDirect3DVolume9::SetPrivateData, GPTR(ARG(1)), GPTR(ARG(2)), ARG(3), ARG(4));
     RET((uint32_t)r, 5);
 }
 
 static void B_IDirect3DVolume9_GetPrivateData(CPU *c) {
     IDirect3DVolume9 *self = (IDirect3DVolume9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVolume9::GetPrivateData", 3);
+    d3d_trace(c, "IDirect3DVolume9::GetPrivateData", 3);
     auto r = bridge_call(self, &IDirect3DVolume9::GetPrivateData, GPTR(ARG(1)), GPTR(ARG(2)), GPTR(ARG(3)));
     RET((uint32_t)r, 4);
 }
 
 static void B_IDirect3DVolume9_FreePrivateData(CPU *c) {
     IDirect3DVolume9 *self = (IDirect3DVolume9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVolume9::FreePrivateData", 1);
+    d3d_trace(c, "IDirect3DVolume9::FreePrivateData", 1);
     auto r = bridge_call(self, &IDirect3DVolume9::FreePrivateData, GPTR(ARG(1)));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DVolume9_GetDesc(CPU *c) {
     IDirect3DVolume9 *self = (IDirect3DVolume9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVolume9::GetDesc", 1);
+    d3d_trace(c, "IDirect3DVolume9::GetDesc", 1);
     auto r = bridge_call(self, &IDirect3DVolume9::GetDesc, GPTR(ARG(1)));
     RET((uint32_t)r, 2);
 }
@@ -1292,7 +1292,7 @@ static void B_IDirect3DSurface9_AddRef(CPU *c) { com_AddRef(c); }
 static void B_IDirect3DSurface9_Release(CPU *c) { com_Release(c); }
 static void B_IDirect3DSurface9_GetDevice(CPU *c) {
     IDirect3DSurface9 *self = (IDirect3DSurface9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DSurface9::GetDevice", 1);
+    d3d_trace(c, "IDirect3DSurface9::GetDevice", 1);
     IDirect3DDevice9 *out0 = nullptr;
     auto r = bridge_call(self, &IDirect3DSurface9::GetDevice, &out0);
     if (ARG(1)) M32(ARG(1)) = d3d9_wrap(out0, IFACE_IDirect3DDevice9);
@@ -1301,49 +1301,49 @@ static void B_IDirect3DSurface9_GetDevice(CPU *c) {
 
 static void B_IDirect3DSurface9_SetPrivateData(CPU *c) {
     IDirect3DSurface9 *self = (IDirect3DSurface9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DSurface9::SetPrivateData", 4);
+    d3d_trace(c, "IDirect3DSurface9::SetPrivateData", 4);
     auto r = bridge_call(self, &IDirect3DSurface9::SetPrivateData, GPTR(ARG(1)), GPTR(ARG(2)), ARG(3), ARG(4));
     RET((uint32_t)r, 5);
 }
 
 static void B_IDirect3DSurface9_GetPrivateData(CPU *c) {
     IDirect3DSurface9 *self = (IDirect3DSurface9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DSurface9::GetPrivateData", 3);
+    d3d_trace(c, "IDirect3DSurface9::GetPrivateData", 3);
     auto r = bridge_call(self, &IDirect3DSurface9::GetPrivateData, GPTR(ARG(1)), GPTR(ARG(2)), GPTR(ARG(3)));
     RET((uint32_t)r, 4);
 }
 
 static void B_IDirect3DSurface9_FreePrivateData(CPU *c) {
     IDirect3DSurface9 *self = (IDirect3DSurface9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DSurface9::FreePrivateData", 1);
+    d3d_trace(c, "IDirect3DSurface9::FreePrivateData", 1);
     auto r = bridge_call(self, &IDirect3DSurface9::FreePrivateData, GPTR(ARG(1)));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DSurface9_SetPriority(CPU *c) {
     IDirect3DSurface9 *self = (IDirect3DSurface9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DSurface9::SetPriority", 1);
+    d3d_trace(c, "IDirect3DSurface9::SetPriority", 1);
     auto r = bridge_call(self, &IDirect3DSurface9::SetPriority, ARG(1));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DSurface9_GetPriority(CPU *c) {
     IDirect3DSurface9 *self = (IDirect3DSurface9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DSurface9::GetPriority", 0);
+    d3d_trace(c, "IDirect3DSurface9::GetPriority", 0);
     auto r = bridge_call(self, &IDirect3DSurface9::GetPriority);
     RET((uint32_t)r, 1);
 }
 
 static void B_IDirect3DSurface9_PreLoad(CPU *c) {
     IDirect3DSurface9 *self = (IDirect3DSurface9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DSurface9::PreLoad", 0);
+    d3d_trace(c, "IDirect3DSurface9::PreLoad", 0);
     bridge_call(self, &IDirect3DSurface9::PreLoad);
     RET(0, 1);
 }
 
 static void B_IDirect3DSurface9_GetType(CPU *c) {
     IDirect3DSurface9 *self = (IDirect3DSurface9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DSurface9::GetType", 0);
+    d3d_trace(c, "IDirect3DSurface9::GetType", 0);
     auto r = bridge_call(self, &IDirect3DSurface9::GetType);
     RET((uint32_t)r, 1);
 }
@@ -1353,7 +1353,7 @@ static void B_IDirect3DVertexBuffer9_AddRef(CPU *c) { com_AddRef(c); }
 static void B_IDirect3DVertexBuffer9_Release(CPU *c) { com_Release(c); }
 static void B_IDirect3DVertexBuffer9_GetDevice(CPU *c) {
     IDirect3DVertexBuffer9 *self = (IDirect3DVertexBuffer9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVertexBuffer9::GetDevice", 1);
+    d3d_trace(c, "IDirect3DVertexBuffer9::GetDevice", 1);
     IDirect3DDevice9 *out0 = nullptr;
     auto r = bridge_call(self, &IDirect3DVertexBuffer9::GetDevice, &out0);
     if (ARG(1)) M32(ARG(1)) = d3d9_wrap(out0, IFACE_IDirect3DDevice9);
@@ -1362,56 +1362,56 @@ static void B_IDirect3DVertexBuffer9_GetDevice(CPU *c) {
 
 static void B_IDirect3DVertexBuffer9_SetPrivateData(CPU *c) {
     IDirect3DVertexBuffer9 *self = (IDirect3DVertexBuffer9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVertexBuffer9::SetPrivateData", 4);
+    d3d_trace(c, "IDirect3DVertexBuffer9::SetPrivateData", 4);
     auto r = bridge_call(self, &IDirect3DVertexBuffer9::SetPrivateData, GPTR(ARG(1)), GPTR(ARG(2)), ARG(3), ARG(4));
     RET((uint32_t)r, 5);
 }
 
 static void B_IDirect3DVertexBuffer9_GetPrivateData(CPU *c) {
     IDirect3DVertexBuffer9 *self = (IDirect3DVertexBuffer9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVertexBuffer9::GetPrivateData", 3);
+    d3d_trace(c, "IDirect3DVertexBuffer9::GetPrivateData", 3);
     auto r = bridge_call(self, &IDirect3DVertexBuffer9::GetPrivateData, GPTR(ARG(1)), GPTR(ARG(2)), GPTR(ARG(3)));
     RET((uint32_t)r, 4);
 }
 
 static void B_IDirect3DVertexBuffer9_FreePrivateData(CPU *c) {
     IDirect3DVertexBuffer9 *self = (IDirect3DVertexBuffer9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVertexBuffer9::FreePrivateData", 1);
+    d3d_trace(c, "IDirect3DVertexBuffer9::FreePrivateData", 1);
     auto r = bridge_call(self, &IDirect3DVertexBuffer9::FreePrivateData, GPTR(ARG(1)));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DVertexBuffer9_SetPriority(CPU *c) {
     IDirect3DVertexBuffer9 *self = (IDirect3DVertexBuffer9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVertexBuffer9::SetPriority", 1);
+    d3d_trace(c, "IDirect3DVertexBuffer9::SetPriority", 1);
     auto r = bridge_call(self, &IDirect3DVertexBuffer9::SetPriority, ARG(1));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DVertexBuffer9_GetPriority(CPU *c) {
     IDirect3DVertexBuffer9 *self = (IDirect3DVertexBuffer9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVertexBuffer9::GetPriority", 0);
+    d3d_trace(c, "IDirect3DVertexBuffer9::GetPriority", 0);
     auto r = bridge_call(self, &IDirect3DVertexBuffer9::GetPriority);
     RET((uint32_t)r, 1);
 }
 
 static void B_IDirect3DVertexBuffer9_PreLoad(CPU *c) {
     IDirect3DVertexBuffer9 *self = (IDirect3DVertexBuffer9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVertexBuffer9::PreLoad", 0);
+    d3d_trace(c, "IDirect3DVertexBuffer9::PreLoad", 0);
     bridge_call(self, &IDirect3DVertexBuffer9::PreLoad);
     RET(0, 1);
 }
 
 static void B_IDirect3DVertexBuffer9_GetType(CPU *c) {
     IDirect3DVertexBuffer9 *self = (IDirect3DVertexBuffer9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVertexBuffer9::GetType", 0);
+    d3d_trace(c, "IDirect3DVertexBuffer9::GetType", 0);
     auto r = bridge_call(self, &IDirect3DVertexBuffer9::GetType);
     RET((uint32_t)r, 1);
 }
 
 static void B_IDirect3DVertexBuffer9_GetDesc(CPU *c) {
     IDirect3DVertexBuffer9 *self = (IDirect3DVertexBuffer9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVertexBuffer9::GetDesc", 1);
+    d3d_trace(c, "IDirect3DVertexBuffer9::GetDesc", 1);
     auto r = bridge_call(self, &IDirect3DVertexBuffer9::GetDesc, GPTR(ARG(1)));
     RET((uint32_t)r, 2);
 }
@@ -1421,7 +1421,7 @@ static void B_IDirect3DIndexBuffer9_AddRef(CPU *c) { com_AddRef(c); }
 static void B_IDirect3DIndexBuffer9_Release(CPU *c) { com_Release(c); }
 static void B_IDirect3DIndexBuffer9_GetDevice(CPU *c) {
     IDirect3DIndexBuffer9 *self = (IDirect3DIndexBuffer9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DIndexBuffer9::GetDevice", 1);
+    d3d_trace(c, "IDirect3DIndexBuffer9::GetDevice", 1);
     IDirect3DDevice9 *out0 = nullptr;
     auto r = bridge_call(self, &IDirect3DIndexBuffer9::GetDevice, &out0);
     if (ARG(1)) M32(ARG(1)) = d3d9_wrap(out0, IFACE_IDirect3DDevice9);
@@ -1430,56 +1430,56 @@ static void B_IDirect3DIndexBuffer9_GetDevice(CPU *c) {
 
 static void B_IDirect3DIndexBuffer9_SetPrivateData(CPU *c) {
     IDirect3DIndexBuffer9 *self = (IDirect3DIndexBuffer9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DIndexBuffer9::SetPrivateData", 4);
+    d3d_trace(c, "IDirect3DIndexBuffer9::SetPrivateData", 4);
     auto r = bridge_call(self, &IDirect3DIndexBuffer9::SetPrivateData, GPTR(ARG(1)), GPTR(ARG(2)), ARG(3), ARG(4));
     RET((uint32_t)r, 5);
 }
 
 static void B_IDirect3DIndexBuffer9_GetPrivateData(CPU *c) {
     IDirect3DIndexBuffer9 *self = (IDirect3DIndexBuffer9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DIndexBuffer9::GetPrivateData", 3);
+    d3d_trace(c, "IDirect3DIndexBuffer9::GetPrivateData", 3);
     auto r = bridge_call(self, &IDirect3DIndexBuffer9::GetPrivateData, GPTR(ARG(1)), GPTR(ARG(2)), GPTR(ARG(3)));
     RET((uint32_t)r, 4);
 }
 
 static void B_IDirect3DIndexBuffer9_FreePrivateData(CPU *c) {
     IDirect3DIndexBuffer9 *self = (IDirect3DIndexBuffer9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DIndexBuffer9::FreePrivateData", 1);
+    d3d_trace(c, "IDirect3DIndexBuffer9::FreePrivateData", 1);
     auto r = bridge_call(self, &IDirect3DIndexBuffer9::FreePrivateData, GPTR(ARG(1)));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DIndexBuffer9_SetPriority(CPU *c) {
     IDirect3DIndexBuffer9 *self = (IDirect3DIndexBuffer9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DIndexBuffer9::SetPriority", 1);
+    d3d_trace(c, "IDirect3DIndexBuffer9::SetPriority", 1);
     auto r = bridge_call(self, &IDirect3DIndexBuffer9::SetPriority, ARG(1));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DIndexBuffer9_GetPriority(CPU *c) {
     IDirect3DIndexBuffer9 *self = (IDirect3DIndexBuffer9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DIndexBuffer9::GetPriority", 0);
+    d3d_trace(c, "IDirect3DIndexBuffer9::GetPriority", 0);
     auto r = bridge_call(self, &IDirect3DIndexBuffer9::GetPriority);
     RET((uint32_t)r, 1);
 }
 
 static void B_IDirect3DIndexBuffer9_PreLoad(CPU *c) {
     IDirect3DIndexBuffer9 *self = (IDirect3DIndexBuffer9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DIndexBuffer9::PreLoad", 0);
+    d3d_trace(c, "IDirect3DIndexBuffer9::PreLoad", 0);
     bridge_call(self, &IDirect3DIndexBuffer9::PreLoad);
     RET(0, 1);
 }
 
 static void B_IDirect3DIndexBuffer9_GetType(CPU *c) {
     IDirect3DIndexBuffer9 *self = (IDirect3DIndexBuffer9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DIndexBuffer9::GetType", 0);
+    d3d_trace(c, "IDirect3DIndexBuffer9::GetType", 0);
     auto r = bridge_call(self, &IDirect3DIndexBuffer9::GetType);
     RET((uint32_t)r, 1);
 }
 
 static void B_IDirect3DIndexBuffer9_GetDesc(CPU *c) {
     IDirect3DIndexBuffer9 *self = (IDirect3DIndexBuffer9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DIndexBuffer9::GetDesc", 1);
+    d3d_trace(c, "IDirect3DIndexBuffer9::GetDesc", 1);
     auto r = bridge_call(self, &IDirect3DIndexBuffer9::GetDesc, GPTR(ARG(1)));
     RET((uint32_t)r, 2);
 }
@@ -1489,7 +1489,7 @@ static void B_IDirect3DVertexDeclaration9_AddRef(CPU *c) { com_AddRef(c); }
 static void B_IDirect3DVertexDeclaration9_Release(CPU *c) { com_Release(c); }
 static void B_IDirect3DVertexDeclaration9_GetDevice(CPU *c) {
     IDirect3DVertexDeclaration9 *self = (IDirect3DVertexDeclaration9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVertexDeclaration9::GetDevice", 1);
+    d3d_trace(c, "IDirect3DVertexDeclaration9::GetDevice", 1);
     IDirect3DDevice9 *out0 = nullptr;
     auto r = bridge_call(self, &IDirect3DVertexDeclaration9::GetDevice, &out0);
     if (ARG(1)) M32(ARG(1)) = d3d9_wrap(out0, IFACE_IDirect3DDevice9);
@@ -1498,7 +1498,7 @@ static void B_IDirect3DVertexDeclaration9_GetDevice(CPU *c) {
 
 static void B_IDirect3DVertexDeclaration9_GetDeclaration(CPU *c) {
     IDirect3DVertexDeclaration9 *self = (IDirect3DVertexDeclaration9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVertexDeclaration9::GetDeclaration", 2);
+    d3d_trace(c, "IDirect3DVertexDeclaration9::GetDeclaration", 2);
     auto r = bridge_call(self, &IDirect3DVertexDeclaration9::GetDeclaration, GPTR(ARG(1)), GPTR(ARG(2)));
     RET((uint32_t)r, 3);
 }
@@ -1508,7 +1508,7 @@ static void B_IDirect3DVertexShader9_AddRef(CPU *c) { com_AddRef(c); }
 static void B_IDirect3DVertexShader9_Release(CPU *c) { com_Release(c); }
 static void B_IDirect3DVertexShader9_GetDevice(CPU *c) {
     IDirect3DVertexShader9 *self = (IDirect3DVertexShader9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVertexShader9::GetDevice", 1);
+    d3d_trace(c, "IDirect3DVertexShader9::GetDevice", 1);
     IDirect3DDevice9 *out0 = nullptr;
     auto r = bridge_call(self, &IDirect3DVertexShader9::GetDevice, &out0);
     if (ARG(1)) M32(ARG(1)) = d3d9_wrap(out0, IFACE_IDirect3DDevice9);
@@ -1517,7 +1517,7 @@ static void B_IDirect3DVertexShader9_GetDevice(CPU *c) {
 
 static void B_IDirect3DVertexShader9_GetFunction(CPU *c) {
     IDirect3DVertexShader9 *self = (IDirect3DVertexShader9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DVertexShader9::GetFunction", 2);
+    d3d_trace(c, "IDirect3DVertexShader9::GetFunction", 2);
     auto r = bridge_call(self, &IDirect3DVertexShader9::GetFunction, GPTR(ARG(1)), GPTR(ARG(2)));
     RET((uint32_t)r, 3);
 }
@@ -1527,7 +1527,7 @@ static void B_IDirect3DPixelShader9_AddRef(CPU *c) { com_AddRef(c); }
 static void B_IDirect3DPixelShader9_Release(CPU *c) { com_Release(c); }
 static void B_IDirect3DPixelShader9_GetDevice(CPU *c) {
     IDirect3DPixelShader9 *self = (IDirect3DPixelShader9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DPixelShader9::GetDevice", 1);
+    d3d_trace(c, "IDirect3DPixelShader9::GetDevice", 1);
     IDirect3DDevice9 *out0 = nullptr;
     auto r = bridge_call(self, &IDirect3DPixelShader9::GetDevice, &out0);
     if (ARG(1)) M32(ARG(1)) = d3d9_wrap(out0, IFACE_IDirect3DDevice9);
@@ -1536,7 +1536,7 @@ static void B_IDirect3DPixelShader9_GetDevice(CPU *c) {
 
 static void B_IDirect3DPixelShader9_GetFunction(CPU *c) {
     IDirect3DPixelShader9 *self = (IDirect3DPixelShader9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DPixelShader9::GetFunction", 2);
+    d3d_trace(c, "IDirect3DPixelShader9::GetFunction", 2);
     auto r = bridge_call(self, &IDirect3DPixelShader9::GetFunction, GPTR(ARG(1)), GPTR(ARG(2)));
     RET((uint32_t)r, 3);
 }
@@ -1546,7 +1546,7 @@ static void B_IDirect3DStateBlock9_AddRef(CPU *c) { com_AddRef(c); }
 static void B_IDirect3DStateBlock9_Release(CPU *c) { com_Release(c); }
 static void B_IDirect3DStateBlock9_GetDevice(CPU *c) {
     IDirect3DStateBlock9 *self = (IDirect3DStateBlock9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DStateBlock9::GetDevice", 1);
+    d3d_trace(c, "IDirect3DStateBlock9::GetDevice", 1);
     IDirect3DDevice9 *out0 = nullptr;
     auto r = bridge_call(self, &IDirect3DStateBlock9::GetDevice, &out0);
     if (ARG(1)) M32(ARG(1)) = d3d9_wrap(out0, IFACE_IDirect3DDevice9);
@@ -1555,14 +1555,14 @@ static void B_IDirect3DStateBlock9_GetDevice(CPU *c) {
 
 static void B_IDirect3DStateBlock9_Capture(CPU *c) {
     IDirect3DStateBlock9 *self = (IDirect3DStateBlock9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DStateBlock9::Capture", 0);
+    d3d_trace(c, "IDirect3DStateBlock9::Capture", 0);
     auto r = bridge_call(self, &IDirect3DStateBlock9::Capture);
     RET((uint32_t)r, 1);
 }
 
 static void B_IDirect3DStateBlock9_Apply(CPU *c) {
     IDirect3DStateBlock9 *self = (IDirect3DStateBlock9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DStateBlock9::Apply", 0);
+    d3d_trace(c, "IDirect3DStateBlock9::Apply", 0);
     auto r = bridge_call(self, &IDirect3DStateBlock9::Apply);
     RET((uint32_t)r, 1);
 }
@@ -1572,7 +1572,7 @@ static void B_IDirect3DQuery9_AddRef(CPU *c) { com_AddRef(c); }
 static void B_IDirect3DQuery9_Release(CPU *c) { com_Release(c); }
 static void B_IDirect3DQuery9_GetDevice(CPU *c) {
     IDirect3DQuery9 *self = (IDirect3DQuery9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DQuery9::GetDevice", 1);
+    d3d_trace(c, "IDirect3DQuery9::GetDevice", 1);
     IDirect3DDevice9 *out0 = nullptr;
     auto r = bridge_call(self, &IDirect3DQuery9::GetDevice, &out0);
     if (ARG(1)) M32(ARG(1)) = d3d9_wrap(out0, IFACE_IDirect3DDevice9);
@@ -1581,28 +1581,28 @@ static void B_IDirect3DQuery9_GetDevice(CPU *c) {
 
 static void B_IDirect3DQuery9_GetType(CPU *c) {
     IDirect3DQuery9 *self = (IDirect3DQuery9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DQuery9::GetType", 0);
+    d3d_trace(c, "IDirect3DQuery9::GetType", 0);
     auto r = bridge_call(self, &IDirect3DQuery9::GetType);
     RET((uint32_t)r, 1);
 }
 
 static void B_IDirect3DQuery9_GetDataSize(CPU *c) {
     IDirect3DQuery9 *self = (IDirect3DQuery9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DQuery9::GetDataSize", 0);
+    d3d_trace(c, "IDirect3DQuery9::GetDataSize", 0);
     auto r = bridge_call(self, &IDirect3DQuery9::GetDataSize);
     RET((uint32_t)r, 1);
 }
 
 static void B_IDirect3DQuery9_Issue(CPU *c) {
     IDirect3DQuery9 *self = (IDirect3DQuery9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DQuery9::Issue", 1);
+    d3d_trace(c, "IDirect3DQuery9::Issue", 1);
     auto r = bridge_call(self, &IDirect3DQuery9::Issue, ARG(1));
     RET((uint32_t)r, 2);
 }
 
 static void B_IDirect3DQuery9_GetData(CPU *c) {
     IDirect3DQuery9 *self = (IDirect3DQuery9 *)com_host(ARG(0));
-    if (g_d3d_trace) d3d_trace(c, "IDirect3DQuery9::GetData", 3);
+    d3d_trace(c, "IDirect3DQuery9::GetData", 3);
     auto r = bridge_call(self, &IDirect3DQuery9::GetData, GPTR(ARG(1)), ARG(2), ARG(3));
     RET((uint32_t)r, 4);
 }

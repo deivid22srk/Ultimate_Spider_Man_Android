@@ -127,6 +127,8 @@ namespace dxvk {
           m_finishQueue.push(std::move(entry));
       } else if (status == VK_ERROR_DEVICE_LOST || entry.submit.cmdList != nullptr) {
         Logger::err(str::format("DxvkSubmissionQueue: Command submission failed: ", status));
+        if (status == VK_ERROR_DEVICE_LOST)
+          g_dxvkDeviceLost.store(true, std::memory_order_release);
         m_lastError = status;
         m_device->waitForIdle();
       }
@@ -167,6 +169,8 @@ namespace dxvk {
       
       if (status != VK_SUCCESS) {
         Logger::err(str::format("DxvkSubmissionQueue: Failed to sync fence: ", status));
+        if (status == VK_ERROR_DEVICE_LOST)
+          g_dxvkDeviceLost.store(true, std::memory_order_release);
         m_lastError = status;
         m_device->waitForIdle();
       }

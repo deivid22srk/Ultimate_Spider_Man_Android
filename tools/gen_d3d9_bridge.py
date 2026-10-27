@@ -150,7 +150,10 @@ def gen():
             args = spec.split() if spec else []
             o.append("static void %s(CPU *c) {" % fn)
             o.append("    %s *self = (%s *)com_host(ARG(0));" % (iface, iface))
-            o.append("    if (g_d3d_trace) d3d_trace(c, \"%s::%s\", %d);" % (iface, name, len(args)))
+            # d3d_trace always runs: it feeds the always-on ring buffer that the
+            # watchdog dumps when frames stop or the device is lost; printing is
+            # still gated on g_d3d_trace inside d3d_trace.
+            o.append("    d3d_trace(c, \"%s::%s\", %d);" % (iface, name, len(args)))
             if name.startswith("Draw") and not name.endswith("Patch"):
                 o.append("    if (g_bisect && d3d_skip_draw()) { RET(0, %d); return; }" % (len(args) + 1))
                 o.append("    d3d9_count_draw();  /* per-frame draw total, see d3d9_bridge.cpp */")

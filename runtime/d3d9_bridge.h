@@ -35,6 +35,10 @@ void d3d_trace(CPU *c, const char *name, int nargs);
 extern "C" {
 void d3d9_count_draw(void);
 uint32_t d3d9_last_frame_draws(void);
+// Watchdog helpers (runtime/dispatch.c): the last D3D9 bridge calls, dumped
+// when frames stop or the Vulkan device is lost, so the log names the calls
+// that preceded the freeze without a local reproduction.
+void d3d9_dump_last_calls(void);
 }
 
 extern "C" {
