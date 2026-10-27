@@ -33,6 +33,11 @@ namespace dxvk {
    *  shaders rescale by 255/32767 (only when the driver cannot fetch the
    *  scaled formats natively). LB_NOSCALED overrides. */
   extern bool g_dxvkUbyte4AsUint;
+  /** Whether the device supports shader clip distances. D3D9 user clip planes
+   *  are implemented with gl_ClipDistance; drivers such as Mali report
+   *  shaderClipDistance = 0 and their shader compiler faults on a module that
+   *  declares BuiltIn ClipDistance, so the shaders must not use it there. */
+  extern bool g_dxvkClipDistance;
 
   
   class DxvkInstance;

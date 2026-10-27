@@ -56,6 +56,7 @@ Actions (NDK 27.2.12479018, clang 18).
 | `runtime/usm_shims.c` CRT/dialog/image-list shims beyond the exercised paths | compiles, but not every shim has been hit by real game code |
 | `tools/difftest.py` (lifter self-test) | `unicorn` does not build in this Termux/Android environment; run it on a normal Linux host |
 | Mali vertex formats: use the driver's native scaled UBYTE4/SHORT2/SHORT4 fetch instead of the forced normalized+rescale path (`g_dxvkUbyte4AsUint`, §11f of `docs/RECON.md`) | fixes the Mali-G615/G57 character-mesh spikes (`issue #1`). Offline check: `clang++ -fsyntax-only` on `dxvk_device.cpp` with the target's flags and the tree's `-Wno-everything`, exit 0. No Mali device here, so the on-device run that shows `UBYTE4/SHORT fetched scaled` and no spikes is still pending; Adreno keeps the old path |
+| Mali clip distance: emit `gl_ClipDistance` only when `shaderClipDistance` is enabled (`g_dxvkClipDistance`, §11g of `docs/RECON.md`) | targets the G57 black-screen crash whose log shows `shaderClipDistance : 0` and a fault in `libGLES_mali.so ... cmpbe_v2_compile_multiple_shaders`, called from `DxvkGraphicsPipeline::createPipeline`. Offline check: `clang++ -fsyntax-only` with the target's flags on all five changed files (`dxvk_device.{h,cpp}`, `dxso_compiler.cpp`, `d3d9_fixed_function.cpp`, `d3d9_device.cpp`), exit 0. No Mali device here, so the run that shows the first world frame and `Port: shaderClipDistance NOT supported` is still pending; Adreno (feature = 1) takes the unchanged path |
 
 ## Not implemented / blocked
 

@@ -1964,6 +1964,14 @@ namespace dxvk {
         case D3DRS_CLIPPLANEENABLE: {
           const bool clipPlaneEnabled = IsClipPlaneEnabled();
 
+          if (clipPlaneEnabled && !g_dxvkClipDistance) {
+            static bool warned;
+            if (!warned++) {
+              Logger::warn("D3D9: user clip planes requested but shaderClipDistance "
+                           "is not supported by the device; clipping is disabled");
+            }
+          }
+
           if (clipPlaneEnabled != oldClipPlaneEnabled)
             m_flags.set(D3D9DeviceFlag::DirtyFFVertexShader);
 

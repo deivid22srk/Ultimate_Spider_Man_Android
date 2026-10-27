@@ -519,6 +519,59 @@ does. Verify on a Mali device: the character spikes should be gone and
 `port/log.txt` should read `..., UBYTE4/SHORT fetched scaled` instead of
 `normalized + rescaled`.
 
+## 11g. Mali: no `shaderClipDistance`, so DXVK's VS clipping killed the shader compiler
+
+The G57 report (Mali-G57 MC2, driver 54.1.0, Infinix Hot 60 Pro / Helio G200)
+is a hard crash, not a glitch: the front end loads, the first world frame is
+black, and the process dies (`CRASH: signal 11 ... at address 0x50`). The
+backtrace is inside the driver's shader compiler, called from DXVK:
+
+    #06 libGLES_mali.so+0x1db1790 (cmpbe_v2_compile_multiple_shaders+0xd90)
+    #11 libdxvk_d3d9.so (_ZNK4dxvk20DxvkGraphicsPipeline14createPipeline...)
+    #16 libdxvk_d3d9.so (_ZN4dxvk11DxvkContext4drawEjjjj...)
+
+So `vkCreateGraphicsPipelines` hands Mali a SPIR-V module its compiler cannot
+consume. The device dump in the same log says which module:
+
+    shaderClipDistance                     : 0
+
+The working Adreno log (`2log.txt`) says `shaderClipDistance : 1`; nothing else
+in the two feature dumps differs in a way that a D3D9 vertex shader uses
+unconditionally. A raw `shaderClipDistance` was not the whole story, though:
+the port *did* read the feature (`D3D9DeviceEx::GetDeviceFeatures` copies it
+into the enabled features), but the shader emitters ignored it. Both VS paths
+declared `gl_ClipDistance` on every module:
+
+* `dxso_compiler.cpp`: `emitVsInit()` always enabled
+  `spv::CapabilityClipDistance`, and `emitVsFinalize()` always called
+  `emitVsClipping()`, which declares the `BuiltIn ClipDistance` output and
+  stores `MaxClipPlanes` dot products into it — for every vertex shader, whether
+  or not the game enables a clip plane.
+* `d3d9_fixed_function.cpp`: `setupVS()` enabled the same capability and
+  `emitVsClipping()` declared the same built-in for the fixed-function VS.
+
+Using a feature the device reported as absent is invalid SPIR-V; Mali's
+compiler does not reject it, it dereferences a null pointer. That is exactly the
+first-pipeline crash in the log (the last line before the fault is the vertex
+declaration for the first world draw, `decltype 2 usage 0 ->
+VK_FORMAT_R32G32B32_SFLOAT`, followed immediately by pipeline creation).
+
+The fix is to make the emitters follow the feature they were already given:
+`g_dxvkClipDistance` is set from `features.core.features.shaderClipDistance` in
+the `DxvkDevice` constructor (next to `g_dxvkDepthClamp`), and both compilers
+only enable the capability / emit the clipping pass when it is true. The VS
+sees the same interface minus the `gl_ClipDistance` output. `D3D9DeviceEx` logs
+`Port: shaderClipDistance NOT supported; D3D9 user clip planes are disabled`
+once at creation, and warns once if `D3DRS_CLIPPLANEENABLE` is ever turned on,
+so the remaining behaviour change (user clip planes are not applied, which no
+D3D9 title should depend on for correctness of the scene) is visible in
+`port/log.txt` instead of silent. Devices that do support clip distances,
+including the reference Adreno, take the old path unchanged.
+
+Verify on a Mali device: no `cmpbe_v2_compile_multiple_shaders` fault, the
+first world frame renders instead of the black screen, and `port/log.txt`
+contains the warning above (proving the fallback was the path taken).
+
 ## 12. Risk plan
 
 | Risk | Likelihood | Mitigation |

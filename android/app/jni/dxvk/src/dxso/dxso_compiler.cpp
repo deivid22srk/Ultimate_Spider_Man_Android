@@ -10,6 +10,7 @@
 #include "dxso_util.h"
 
 #include "../dxvk/dxvk_spec_const.h"
+#include "../dxvk/dxvk_device.h"
 
 #include <cfloat>
 
@@ -419,7 +420,11 @@ namespace dxvk {
 
 
   void DxsoCompiler::emitVsInit() {
-    m_module.enableCapability(spv::CapabilityClipDistance);
+    // Only declare the capability when the device enables shaderClipDistance.
+    // Mali (shaderClipDistance = 0) faults in its compiler on a module that
+    // declares BuiltIn ClipDistance; the clipping pass is skipped below too.
+    if (g_dxvkClipDistance)
+      m_module.enableCapability(spv::CapabilityClipDistance);
 
     // Only VS needs this, because PS has
     // non-indexable specialized output regs
@@ -3755,7 +3760,8 @@ void DxsoCompiler::emitControlFlowGenericLoop(
       m_vs.functionId, 0, nullptr);
     this->emitLinkerOutputSetup();
 
-    this->emitVsClipping();
+    if (g_dxvkClipDistance)
+      this->emitVsClipping();
 
     this->emitFunctionEnd();
   }

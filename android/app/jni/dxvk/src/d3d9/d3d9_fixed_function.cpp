@@ -6,6 +6,7 @@
 
 #include "../dxvk/dxvk_hash.h"
 #include "../dxvk/dxvk_spec_const.h"
+#include "../dxvk/dxvk_device.h"
 
 #include "../spirv/spirv_module.h"
 
@@ -1177,7 +1178,7 @@ namespace dxvk {
     uint32_t pointSize = m_module.opFClamp(m_floatType, pointInfo.defaultValue, pointInfo.min, pointInfo.max);
     m_module.opStore(m_vs.out.POINTSIZE, pointSize);
 
-    if (m_vsKey.Data.Contents.VertexClipping)
+    if (m_vsKey.Data.Contents.VertexClipping && g_dxvkClipDistance)
       emitVsClipping(vtx);
   }
 
@@ -1436,8 +1437,10 @@ namespace dxvk {
   void D3D9FFShaderCompiler::setupVS() {
     setupRenderStateInfo();
 
-    // VS Caps
-    m_module.enableCapability(spv::CapabilityClipDistance);
+    // VS Caps. Only use gl_ClipDistance when the device enables the feature;
+    // Mali's shader compiler faults on BuiltIn ClipDistance otherwise.
+    if (g_dxvkClipDistance)
+      m_module.enableCapability(spv::CapabilityClipDistance);
 
     emitLightTypeDecl();
     emitBaseBufferDecl();

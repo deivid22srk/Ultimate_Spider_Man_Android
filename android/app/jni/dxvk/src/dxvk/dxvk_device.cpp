@@ -5,6 +5,7 @@ namespace dxvk {
 
   bool g_dxvkDepthClamp = true;
   bool g_dxvkUbyte4AsUint = false;
+  bool g_dxvkClipDistance = false;
 
   
   DxvkDevice::DxvkDevice(
@@ -24,6 +25,15 @@ namespace dxvk {
     m_objects           (this),
     m_submissionQueue   (this) {
     g_dxvkDepthClamp = features.core.features.depthClamp;
+    // D3D9 implements user clip planes with gl_ClipDistance. Some mobile
+    // drivers (Mali reports shaderClipDistance = 0 on the G57 with 54.1.0)
+    // claim not to support it; emitting BuiltIn ClipDistance anyway makes
+    // such a driver's shader compiler dereference a null pointer while
+    // vkCreateGraphicsPipelines runs. Only emit the clipping path when the
+    // feature is really enabled.
+    g_dxvkClipDistance = features.core.features.shaderClipDistance;
+    if (!g_dxvkClipDistance)
+      Logger::warn("Port: shaderClipDistance NOT supported; D3D9 user clip planes are disabled");
     {
       // A D3D9 vertex element of UBYTE4/SHORT2/SHORT4 means "fetch the raw
       // integer". Vulkan can do that exactly with the *_USCALED/_SSCALED
