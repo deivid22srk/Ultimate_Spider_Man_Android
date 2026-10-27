@@ -148,6 +148,14 @@ Requirements: arm64 Android 9+, Vulkan 1.1, 3 GB RAM, ~7 GB free space.
    is missing.
 4. Set the options and tap **Play**.
 
+## Custom GPU driver
+
+The launcher can install a user supplied Vulkan driver pack (Turnip and the
+like) and run the renderer on it through libadrenotools, falling back to the
+system driver if the pack does not pass validation. What packs work, how a pack
+is probed and what the `driver:` lines in `port/log.txt` mean:
+[docs/GPU_DRIVERS.md](docs/GPU_DRIVERS.md).
+
 ## Controls
 
 - Controllers: Xbox layout by default; the launcher can swap A/B and X/Y.

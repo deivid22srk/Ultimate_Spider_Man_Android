@@ -39,6 +39,13 @@
  * goes back in place, and the app falls back to the system driver with the
  * reason in the log. With no driver selected none of this runs and everything
  * stays on the system driver, which is the default.
+ *
+ * A failed probe ends with a verdict read from /proc/self/maps, which
+ * separates the three ways a pack can be rejected without needing a logcat
+ * capture: the pack itself is mapped (the hook ran, the pack linked, and it
+ * still reported no GPU -- a pack problem), only the system driver is mapped
+ * (the pack failed to load and the hook fell back), or neither is (the hook
+ * never ran at all -- an integration problem).
  */
 #include "rt.h"
 
@@ -246,6 +253,25 @@ const char *probe_driver(void *gipa_, std::string &detail) {
             LOG("driver: probe heap %u: %llu MiB", h,
                 (unsigned long long)(mem.memoryHeaps[h].size >> 20));
 
+        /* Identity beyond the device name: VK_KHR_driver_properties names the
+         * actual driver ("turnip" vs Qualcomm's blob), so a report says what
+         * really ran even when a pack is named like something else. Optional
+         * on purpose: a 1.0-only pack has no Properties2 and must not be
+         * rejected for it. */
+        auto pdProps2 = PROBE_PFN(inst, vkGetPhysicalDeviceProperties2);
+        if (pdProps2) {
+            VkPhysicalDeviceDriverProperties drv{};
+            drv.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES;
+            VkPhysicalDeviceProperties2 p2{};
+            p2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+            p2.pNext = &drv;
+            pdProps2(pds[0], &p2);
+            if (drv.driverID)
+                LOG("driver: probe driver name '%s', info '%s', conformance %u",
+                    drv.driverName, drv.driverInfo,
+                    (unsigned)drv.conformanceVersion.major);
+        }
+
         /* 4. a device, then the KGSL-sensitive path: host-visible memory
          *    mapped and touched. */
         uint32_t qfam = 0xFFFFFFFFu;
@@ -325,6 +351,48 @@ const char *probe_driver(void *gipa_, std::string &detail) {
     if (inst && destroyInstance) destroyInstance(inst, nullptr);
     g_probe_armed = 0;
     return step;
+}
+
+/* After a failed probe, say which side actually failed. Every loader and
+ * driver in the process shows up in /proc/self/maps as the file it was mapped
+ * from, so:
+ *   - the pack mapped  => the hook ran and the pack linked, but it reported
+ *     no adapters of its own. Turnip built for KGSL enumerates the GPU through
+ *     /dev/kgsl-3d0; DRM-only builds (Termux/glibc packs, Mesa without
+ *     freedreno-kgsl) look for render nodes that stock Android does not
+ *     expose to apps and come back empty-handed -- VK_SUCCESS, 0 devices,
+ *     exactly the signature that used to look like a broken integration.
+ *   - only vulkan.adreno.so mapped => the pack failed to load and the hook's
+ *     fallback ran (the loader then sees the Qualcomm driver).
+ *   - neither mapped => the hook never ran; only logcat (tag hook_impl) can
+ *     say why.
+ */
+void probe_maps_verdict(const std::string &pack_lib, std::string &verdict) {
+    bool pack = false, blob = false;
+    FILE *maps = fopen("/proc/self/maps", "r");
+    if (maps) {
+        char line[2048];
+        while (fgets(line, sizeof line, maps)) {
+            if (strstr(line, pack_lib.c_str())) pack = true;
+            else if (strstr(line, "vulkan.adreno.so")) blob = true;
+        }
+        fclose(maps);
+    }
+    if (!maps) {
+        verdict = "(/proc/self/maps unreadable, verdict unavailable)";
+        return;
+    }
+    if (pack)
+        verdict = "the pack is loaded in the process but reported no GPU: it "
+                  "cannot drive this adapter -- use a KGSL/adrenotools Turnip "
+                  "build for this GPU family (DRM-only packs enumerate zero "
+                  "devices)";
+    else if (blob)
+        verdict = "the pack itself failed to load; the hook fell back to the "
+                  "system driver (logcat tag hook_impl names the dlerror)";
+    else
+        verdict = "no driver library was mapped at all: the adrenotools hook "
+                  "never ran (logcat tag hook_impl has the reason)";
 }
 
 /* Reads just enough of the ELF header to reject packs for another ABI: those
@@ -409,6 +477,11 @@ extern "C" int usm_driver_open(const char *driver_dir, const char *native_lib_di
 
     if (failed) {
         LOG("driver: probe failed at %s (%s), keeping the system driver", failed, detail.c_str());
+        /* The failing step says where it stopped; the maps verdict says whose
+         * fault it is (the pack, the hook's fallback, or the hook itself). */
+        std::string verdict;
+        probe_maps_verdict(lib, verdict);
+        LOG("driver: %s", verdict.c_str());
         return 0;
     }
     LOG("driver: probe passed, using %s", dir.c_str());
