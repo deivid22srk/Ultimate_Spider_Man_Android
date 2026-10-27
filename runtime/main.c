@@ -27,6 +27,9 @@ char g_game_dir[1024] = ".";
 char g_save_dir[1024] = "./save";
 uint32_t g_image_size;
 uint32_t g_entry;
+/* defined below, set from the launcher's argv; named in crash dumps so a bad
+ * GPU driver is immediately visible in a report */
+extern char g_driver_dir[1024];
 
 void rt_log_line(const char *fmt, ...) {
     va_list ap;
@@ -285,6 +288,7 @@ static void on_crash(int sig, siginfo_t *si, void *ucv) {
                 (unsigned long long)uc->uc_mcontext.regs[r], (unsigned long long)uc->uc_mcontext.regs[r + 1 < 31 ? r + 1 : 30],
                 (unsigned long long)uc->uc_mcontext.regs[r + 2 < 31 ? r + 2 : 30], (unsigned long long)uc->uc_mcontext.regs[r + 3 < 31 ? r + 3 : 30]);
     fprintf(stderr, "  guest mem base %p\n", (void *)MEM);
+    if (g_driver_dir[0]) fprintf(stderr, "  driver dir %s (custom)\n", g_driver_dir);
     extern void rt_dump_guest(void);
     rt_dump_guest();
     { extern void rt_wd_dump(void); rt_wd_dump(); }
