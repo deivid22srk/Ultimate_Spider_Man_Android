@@ -41,11 +41,23 @@
  * stays on the system driver, which is the default.
  *
  * A failed probe ends with a verdict read from /proc/self/maps, which
- * separates the three ways a pack can be rejected without needing a logcat
- * capture: the pack itself is mapped (the hook ran, the pack linked, and it
- * still reported no GPU -- a pack problem), only the system driver is mapped
- * (the pack failed to load and the hook fell back), or neither is (the hook
- * never ran at all -- an integration problem).
+ * separates the ways a pack can be rejected without needing a logcat capture:
+ * the pack itself is mapped (the hook ran, the pack linked, and it still
+ * reported no GPU -- a pack problem), a system ICD is mapped instead (the hook
+ * did not take effect), the hook's private loader is mapped but no ICD is (the
+ * ICD open failed inside the hook namespace), or nothing is (the hook never
+ * ran at all -- an integration problem).
+ *
+ * The hook machinery is also the only part of this that fails silently: its
+ * errors are logged by libadrenotools to logcat (tag hook_impl), never to the
+ * port log, and every field report so far failed exactly there. So when the
+ * hook path does not produce a working driver, the same pack is loaded a
+ * second time -- directly into the app's own linker namespace, with no system
+ * loader copy, no isolated namespace and no interposition. KGSL Turnip packs
+ * work that way on their own: the ICD exports vkGetInstanceProcAddr, drives
+ * the GPU through /dev/kgsl-3d0 (which apps may open) and needs nothing from
+ * the hook. A direct load also cannot fail silently: every step has a dlerror,
+ * so the port log ends up saying exactly why a pack does not load.
  */
 #include "rt.h"
 
@@ -355,44 +367,91 @@ const char *probe_driver(void *gipa_, std::string &detail) {
 
 /* After a failed probe, say which side actually failed. Every loader and
  * driver in the process shows up in /proc/self/maps as the file it was mapped
- * from, so:
- *   - the pack mapped  => the hook ran and the pack linked, but it reported
- *     no adapters of its own. Turnip built for KGSL enumerates the GPU through
- *     /dev/kgsl-3d0; DRM-only builds (Termux/glibc packs, Mesa without
- *     freedreno-kgsl) look for render nodes that stock Android does not
- *     expose to apps and come back empty-handed -- VK_SUCCESS, 0 devices,
- *     exactly the signature that used to look like a broken integration.
- *   - only vulkan.adreno.so mapped => the pack failed to load and the hook's
- *     fallback ran (the loader then sees the Qualcomm driver).
- *   - neither mapped => the hook never ran; only logcat (tag hook_impl) can
- *     say why.
- */
+ * from, so scan for each player instead of guessing its name:
+ *   - the pack mapped => it linked but reported no adapters of its own.
+ *     Turnip built for KGSL enumerates the GPU through /dev/kgsl-3d0;
+ *     DRM-only builds (Termux/glibc packs, Mesa without freedreno-kgsl) look
+ *     for render nodes that stock Android does not expose to apps and come
+ *     back empty-handed -- VK_SUCCESS, 0 devices, exactly the signature that
+ *     used to look like a broken integration.
+ *   - a vendor ICD mapped (vulkan.adreno.so on some devices, vulkan.lahaina.so
+ *     on SD888, ...): the hook let the system driver through instead of the
+ *     pack.
+ *   - only the hook's private loader mapped (a /memfd: copy of libvulkan.so):
+ *     the machinery ran but the ICD open failed inside the hook namespace.
+ *   - nothing mapped => the hook never ran; logcat tag hook_impl says why.
+ * The raw flags go into the verdict line too, so a report stays readable even
+ * when none of the categories above matches. */
 void probe_maps_verdict(const std::string &pack_lib, std::string &verdict) {
-    bool pack = false, blob = false;
+    bool pack = false, vendor_icd = false, memfd_loader = false;
     FILE *maps = fopen("/proc/self/maps", "r");
-    if (maps) {
-        char line[2048];
-        while (fgets(line, sizeof line, maps)) {
-            if (strstr(line, pack_lib.c_str())) pack = true;
-            else if (strstr(line, "vulkan.adreno.so")) blob = true;
-        }
-        fclose(maps);
-    }
     if (!maps) {
         verdict = "(/proc/self/maps unreadable, verdict unavailable)";
         return;
     }
+    char line[2048];
+    while (fgets(line, sizeof line, maps)) {
+        if (strstr(line, pack_lib.c_str())) pack = true;
+        else if (strstr(line, "/vendor/") && strstr(line, "vulkan")) vendor_icd = true;
+        if (strstr(line, "/memfd:") && strstr(line, "libvulkan")) memfd_loader = true;
+    }
+    fclose(maps);
+
+    const char *why;
     if (pack)
-        verdict = "the pack is loaded in the process but reported no GPU: it "
-                  "cannot drive this adapter -- use a KGSL/adrenotools Turnip "
-                  "build for this GPU family (DRM-only packs enumerate zero "
-                  "devices)";
-    else if (blob)
-        verdict = "the pack itself failed to load; the hook fell back to the "
-                  "system driver (logcat tag hook_impl names the dlerror)";
+        why = "the pack is loaded in the process but reported no GPU: it cannot "
+              "drive this adapter -- use a KGSL/adrenotools Turnip build for this "
+              "GPU family (DRM-only packs enumerate zero devices)";
+    else if (vendor_icd)
+        why = "a system ICD was mapped instead of the pack: the hook did not take "
+              "effect (logcat tag hook_impl names the dlerror)";
+    else if (memfd_loader)
+        why = "the hook's private loader is mapped but no ICD loaded: the ICD open "
+              "failed inside the hook namespace (logcat tag hook_impl has the reason)";
     else
-        verdict = "no driver library was mapped at all: the adrenotools hook "
-                  "never ran (logcat tag hook_impl has the reason)";
+        why = "no driver library was mapped at all: the adrenotools hook never ran";
+    char flags[160];
+    snprintf(flags, sizeof flags, "; maps: pack=%d vendor-icd=%d hook-loader=%d",
+             (int)pack, (int)vendor_icd, (int)memfd_loader);
+    verdict = std::string(why) + flags;
+}
+
+/* Loads the pack straight into the app's own linker namespace: no system
+ * loader copy, no isolated namespace, no hook interposition -- the ICD *is*
+ * the driver, so everything the adrenotools hook exists to do is skipped.
+ * KGSL Turnip packs work this way on their own: the ICD exports
+ * vkGetInstanceProcAddr (or its ICD-interface twin) and drives the GPU through
+ * /dev/kgsl-3d0, which untrusted apps may open. Unlike the hook path, nothing
+ * here can fail silently: every step ends in a dlerror that goes to the log. */
+bool direct_open(const char *lib, void **out_handle, void **out_gipa, std::string &err) {
+    dlerror();
+    void *h = dlopen(lib, RTLD_NOW | RTLD_LOCAL);
+    if (!h) {
+        const char *e = dlerror();
+        err = e ? e : "dlopen failed without a dlerror";
+        return false;
+    }
+    dlerror();
+    /* Kept as void* on purpose: dlsym returns it that way and probe_driver
+     * casts it back to PFN_vkGetInstanceProcAddr itself. */
+    void *sym = dlsym(h, "vkGetInstanceProcAddr");
+    const char *which = "vkGetInstanceProcAddr";
+    if (!sym) {
+        /* ICD-interface entry point: on Mesa it answers NULL-instance global
+         * lookups exactly like vkGetInstanceProcAddr does. */
+        sym = dlsym(h, "vk_icdGetInstanceProcAddr");
+        which = "vk_icdGetInstanceProcAddr";
+    }
+    if (!sym) {
+        err = "the pack exports neither vkGetInstanceProcAddr nor "
+              "vk_icdGetInstanceProcAddr (not a Vulkan ICD?)";
+        return false;                                /* handle intentionally kept: dlclose of a
+                                                        half-probed driver is not worth the risk */
+    }
+    LOG("driver: direct load resolved %s", which);
+    *out_handle = h;
+    *out_gipa = sym;
+    return true;
 }
 
 /* Reads just enough of the ELF header to reject packs for another ABI: those
@@ -448,46 +507,85 @@ extern "C" int usm_driver_open(const char *driver_dir, const char *native_lib_di
         return 0;
     }
 
+    /* One line of environment forensics before anything runs: the hook needs
+     * its two libraries inside nativeLibraryDir and a real /system/lib64
+     * libvulkan.so to clone; their absence is silent inside libadrenotools. */
+    LOG("driver: hook environment: libhook_impl.so=%s libmain_hook.so=%s system-loader=%s",
+        access((std::string(native_lib_dir) + "/libhook_impl.so").c_str(), R_OK) == 0 ? "ok" : "MISSING",
+        access((std::string(native_lib_dir) + "/libmain_hook.so").c_str(), R_OK) == 0 ? "ok" : "MISSING",
+        access("/system/lib64/libvulkan.so", R_OK) == 0 ? "ok" : "MISSING");
+
     void *handle = adrenotools_open_libvulkan(RTLD_NOW, ADRENOTOOLS_DRIVER_CUSTOM,
                                               nullptr, native_lib_dir, dir.c_str(),
                                               "libvulkan.so", nullptr, nullptr);
-    if (!handle) {
+    if (handle) {
+        void *gipa = dlsym(handle, "vkGetInstanceProcAddr");
+        if (gipa) {
+            LOG("driver: %s opened, probing before use", lib.c_str());
+
+            /* Validate before anything else touches the driver. A failure here
+             * used to be a mid-init SIGSEGV with the game half started; now it
+             * is a fallback with the failing step in the log. */
+            probe_guard_install();
+            std::string detail;
+            const char *failed = probe_driver(gipa, detail);
+            probe_guard_remove();
+
+            if (!failed) {
+                LOG("driver: probe passed (hook path), using %s", dir.c_str());
+                *out_handle = handle;
+                *out_gipa = gipa;
+                return 1;
+            }
+            LOG("driver: probe failed at %s (%s)", failed, detail.c_str());
+            /* The failing step says where it stopped; the maps verdict says
+             * whose fault it is (the pack, the hook's fallback, or the hook). */
+            std::string verdict;
+            probe_maps_verdict(lib, verdict);
+            LOG("driver: %s", verdict.c_str());
+        } else {
+            LOG("driver: %s has no vkGetInstanceProcAddr in the hook loader", lib.c_str());
+        }
+    } else {
         /* Missing hook libraries, a namespace the kernel refuses, or a driver
          * built for another ABI all land here. */
         const char *err = dlerror();
-        LOG("driver: libadrenotools could not open %s%s%s, keeping the system driver",
+        LOG("driver: libadrenotools could not open %s%s%s",
             lib.c_str(), err ? ": " : "", err ? err : "");
+    }
+
+    /* The hook path is the only part of this integration that fails silently:
+     * libadrenotools reports its own errors to logcat (tag hook_impl), which no
+     * user report has ever included, and every field report so far failed
+     * exactly there (the probe ran, no ICD ever mapped). The same pack loaded
+     * directly into the app namespace needs none of the hook machinery, works
+     * for KGSL Turnip, and cannot fail silently. Try it before giving up. */
+    LOG("driver: falling back to a direct load of %s", lib.c_str());
+    void *dhandle = nullptr, *dgipa = nullptr;
+    std::string derr;
+    if (!direct_open(lib.c_str(), &dhandle, &dgipa, derr)) {
+        LOG("driver: direct load failed: %s", derr.c_str());
+        LOG("driver: keeping the system driver");
         return 0;
     }
 
-    void *gipa = dlsym(handle, "vkGetInstanceProcAddr");
-    if (!gipa) {
-        LOG("driver: %s has no vkGetInstanceProcAddr, keeping the system driver", lib.c_str());
-        return 0;
-    }
-    LOG("driver: %s opened, probing before use", lib.c_str());
-
-    /* Validate before anything else touches the driver. A failure here used to
-     * be a mid-init SIGSEGV with the game half started; now it is a fallback
-     * with the failing step in the log. */
     probe_guard_install();
-    std::string detail;
-    const char *failed = probe_driver(gipa, detail);
+    std::string ddetail;
+    const char *dfailed = probe_driver(dgipa, ddetail);
     probe_guard_remove();
 
-    if (failed) {
-        LOG("driver: probe failed at %s (%s), keeping the system driver", failed, detail.c_str());
-        /* The failing step says where it stopped; the maps verdict says whose
-         * fault it is (the pack, the hook's fallback, or the hook itself). */
-        std::string verdict;
-        probe_maps_verdict(lib, verdict);
-        LOG("driver: %s", verdict.c_str());
+    if (dfailed) {
+        LOG("driver: direct-load probe failed at %s (%s)", dfailed, ddetail.c_str());
+        std::string dverdict;
+        probe_maps_verdict(lib, dverdict);
+        LOG("driver: %s", dverdict.c_str());
+        LOG("driver: keeping the system driver");
         return 0;
     }
-    LOG("driver: probe passed, using %s", dir.c_str());
+    LOG("driver: direct-load probe passed, using %s", lib.c_str());
 
-    *out_handle = handle;
-    *out_gipa = gipa;
+    *out_handle = dhandle;
+    *out_gipa = dgipa;
     return 1;
 }
 

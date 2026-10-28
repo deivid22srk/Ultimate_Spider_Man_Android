@@ -65,6 +65,26 @@ SIGSEGV/SIGBUS/SIGILL guard:
 Any failure (including a crash during the probe) falls back to the system
 driver; the app keeps working and the log says what happened.
 
+## The direct-load fallback
+
+The adrenotools hook is the only part of the integration that fails silently:
+its errors go to logcat (`hook_impl`), not to `port/log.txt`. When the hook
+path does not produce a working driver, the runtime loads the same pack a
+second time — directly into the app's own linker namespace, with no system
+loader copy, no isolated namespace and no interposition. KGSL Turnip packs
+work that way on their own (the ICD exports `vkGetInstanceProcAddr` and opens
+`/dev/kgsl-3d0`, which apps may open), and unlike the hook path every failure
+ends in a `dlerror` that lands in the log:
+
+| Line | Meaning |
+|---|---|
+| `driver: hook environment: libhook_impl.so=… libmain_hook.so=… system-loader=…` | presence of the pieces the hook needs, before anything runs |
+| `driver: falling back to a direct load of <path>` | the hook path did not yield a working driver |
+| `driver: direct load resolved vkGetInstanceProcAddr` (or `vk_icdGetInstanceProcAddr`) | the pack loaded directly and exports the ICD entry point |
+| `driver: direct load failed: <dlerror>` | the pack cannot be loaded by bionic at all (missing dependency, wrong build — the dlerror says which) |
+| `driver: direct-load probe passed, using <path>` | the pack drives the renderer, hook skipped entirely |
+| `driver: direct-load probe failed at <step> (<detail>)` | the pack loads but still cannot drive the GPU (a DRM-only pack, for example) |
+
 ## Reading the log
 
 | Line | Meaning |
@@ -75,9 +95,9 @@ driver; the app keeps working and the log says what happened.
 | `driver: <path> opened, probing before use` | the pack is loaded, the probe starts |
 | `driver: probe <device>, vendor…, driver…` | probe success so far: adapter identity |
 | `driver: probe driver name 'turnip', …` | the pack's own driver name (`VK_KHR_driver_properties`) |
-| `driver: probe failed at <step> (<detail>), keeping the system driver` | the pack was rejected at `<step>` |
+| `driver: probe failed at <step> (<detail>)` | the pack was rejected at `<step>` (followed by `keeping the system driver` if nothing else works) |
 | `driver: <verdict sentence>` | who failed, decided by scanning `/proc/self/maps` (below) |
-| `driver: probe passed, using <dir>` | the pack drives the renderer |
+| `driver: probe passed (hook path), using <dir>` | the hook loaded the pack and the probe passed |
 
 The verdict line is the one that says whose fault a rejection is:
 
@@ -85,11 +105,17 @@ The verdict line is the one that says whose fault a rejection is:
   the pack linked, and it still returned zero adapters: the pack cannot drive
   this GPU. Nine times out of ten this is a DRM-only build (see above); the fix
   is a KGSL/adrenotools Turnip pack for the phone's GPU family.
-- **"the pack itself failed to load; the hook fell back to the system driver"**
-  — the pack's `dlopen` failed (missing dependencies, wrong build); logcat tag
-  `hook_impl` names the `dlerror`.
+- **"a system ICD was mapped instead of the pack"** — the hook did not take
+  effect and the loader picked the vendor driver; logcat tag `hook_impl` names
+  the `dlerror`.
+- **"the hook's private loader is mapped but no ICD loaded"** — the machinery
+  ran, but the ICD open failed inside the hook namespace; logcat tag
+  `hook_impl` has the reason. The direct-load fallback below runs right after.
 - **"no driver library was mapped at all"** — the hook never ran; that is an
   integration problem, and logcat tag `hook_impl` has the reason.
+
+Every verdict line ends with raw flags (`maps: pack=N vendor-icd=N
+hook-loader=N`) so a report stays interpretable even when no category matches.
 
 ## Reporting a problem with a pack
 
